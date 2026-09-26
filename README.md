@@ -17,7 +17,6 @@ arguments of each test and compares the returned value with the expected one.
 - **Three interfaces** over the same logic: a web app (practice, exams and a
   teacher area), a CLI and an HTTP API.
 
-The user-facing text (web, CLI, reports) is in European Portuguese.
 
 ## How it works
 
