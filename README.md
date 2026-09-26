@@ -273,3 +273,8 @@ adaptações:
 
 As soluções de referência ficam dentro do módulo, por isso também são
 compiladas e verificadas por `go vet` e `golangci-lint` em `make check`.
+
+## License
+
+Gavel's source code is released under the MIT License — see [`LICENSE`](LICENSE).
+The exercises converted from Exercism keep their original MIT License (see above).
