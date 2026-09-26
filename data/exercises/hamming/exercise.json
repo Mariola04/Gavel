@@ -1,0 +1,16 @@
+{
+  "title": "Distância de Hamming",
+  "description": "Defina a função Distance(a, b string) int que devolve o número de posições em que duas cadeias de ADN com o mesmo comprimento diferem.",
+  "difficulty": "medium",
+  "function": "Distance",
+  "params": ["string", "string"],
+  "returns": "int",
+  "timeout_ms": 1000,
+  "tests": [
+    {"input": ["", ""], "output": 0},
+    {"input": ["A", "A"], "output": 0},
+    {"input": ["G", "T"], "output": 1},
+    {"input": ["GGACTGAAATCTG", "GGACTGAAATCTG"], "output": 0},
+    {"input": ["GGACGGATTCTG", "AGGACGGATTCT"], "output": 9}
+  ]
+}

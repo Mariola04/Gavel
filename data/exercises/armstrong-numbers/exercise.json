@@ -1,0 +1,20 @@
+{
+  "title": "Números de Armstrong",
+  "description": "Defina a função IsArmstrongNumber(n int) bool que indica se n é igual à soma dos seus dígitos, cada um elevado ao número de dígitos de n.",
+  "difficulty": "medium",
+  "function": "IsArmstrongNumber",
+  "params": ["int"],
+  "returns": "bool",
+  "timeout_ms": 1000,
+  "tests": [
+    {"input": [0], "output": true},
+    {"input": [5], "output": true},
+    {"input": [10], "output": false},
+    {"input": [153], "output": true},
+    {"input": [100], "output": false},
+    {"input": [9474], "output": true},
+    {"input": [9475], "output": false},
+    {"input": [9926315], "output": true},
+    {"input": [9926314], "output": false}
+  ]
+}

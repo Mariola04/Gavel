@@ -1,0 +1,20 @@
+{
+  "title": "Ano bissexto",
+  "description": "Defina a função IsLeapYear(year int) bool que indica se um ano é bissexto no calendário gregoriano: divisível por 4, exceto se for divisível por 100 sem ser divisível por 400.",
+  "difficulty": "easy",
+  "function": "IsLeapYear",
+  "params": ["int"],
+  "returns": "bool",
+  "timeout_ms": 1000,
+  "tests": [
+    {"input": [2015], "output": false},
+    {"input": [1970], "output": false},
+    {"input": [1996], "output": true},
+    {"input": [1960], "output": true},
+    {"input": [2100], "output": false},
+    {"input": [1900], "output": false},
+    {"input": [2000], "output": true},
+    {"input": [2400], "output": true},
+    {"input": [1800], "output": false}
+  ]
+}

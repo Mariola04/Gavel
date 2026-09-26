@@ -1,0 +1,29 @@
+{
+  "title": "Gotas de chuva",
+  "description": "Defina a função Convert(n int) string que devolve \"Pling\" se n for divisível por 3, \"Plang\" se for divisível por 5 e \"Plong\" se for divisível por 7, concatenando os sons aplicáveis por esta ordem. Se n não for divisível por nenhum, devolve n como texto.",
+  "difficulty": "easy",
+  "function": "Convert",
+  "params": ["int"],
+  "returns": "string",
+  "timeout_ms": 1000,
+  "tests": [
+    {"input": [1], "output": "1"},
+    {"input": [3], "output": "Pling"},
+    {"input": [5], "output": "Plang"},
+    {"input": [7], "output": "Plong"},
+    {"input": [6], "output": "Pling"},
+    {"input": [8], "output": "8"},
+    {"input": [9], "output": "Pling"},
+    {"input": [10], "output": "Plang"},
+    {"input": [14], "output": "Plong"},
+    {"input": [15], "output": "PlingPlang"},
+    {"input": [21], "output": "PlingPlong"},
+    {"input": [25], "output": "Plang"},
+    {"input": [27], "output": "Pling"},
+    {"input": [35], "output": "PlangPlong"},
+    {"input": [49], "output": "Plong"},
+    {"input": [52], "output": "52"},
+    {"input": [105], "output": "PlingPlangPlong"},
+    {"input": [3125], "output": "Plang"}
+  ]
+}

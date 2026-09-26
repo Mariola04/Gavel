@@ -1,0 +1,20 @@
+{
+  "title": "Acrónimo",
+  "description": "Defina a função Abbreviate(s string) string que devolve o acrónimo de s em maiúsculas. As palavras são separadas por espaços ou hífenes, e a restante pontuação é ignorada.",
+  "difficulty": "medium",
+  "function": "Abbreviate",
+  "params": ["string"],
+  "returns": "string",
+  "timeout_ms": 1000,
+  "tests": [
+    {"input": ["Portable Network Graphics"], "output": "PNG"},
+    {"input": ["Ruby on Rails"], "output": "ROR"},
+    {"input": ["First In, First Out"], "output": "FIFO"},
+    {"input": ["GNU Image Manipulation Program"], "output": "GIMP"},
+    {"input": ["Complementary metal-oxide semiconductor"], "output": "CMOS"},
+    {"input": ["Rolling On The Floor Laughing So Hard That My Dogs Came Over And Licked Me"], "output": "ROTFLSHTMDCOALM"},
+    {"input": ["Something - I made up from thin air"], "output": "SIMUFTA"},
+    {"input": ["Halley's Comet"], "output": "HC"},
+    {"input": ["The Road _Not_ Taken"], "output": "TRNT"}
+  ]
+}

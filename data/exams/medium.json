@@ -1,0 +1,5 @@
+{
+  "title": "Teste médio",
+  "description": "1 exercício fácil, 2 médios e 1 difícil.",
+  "composition": { "easy": 1, "medium": 2, "hard": 1 }
+}

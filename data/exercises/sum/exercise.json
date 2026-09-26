@@ -1,0 +1,16 @@
+{
+  "title": "Soma",
+  "description": "Defina a função Sum(numbers []int) int que devolve a soma dos elementos de numbers.",
+  "difficulty": "easy",
+  "function": "Sum",
+  "params": ["[]int"],
+  "returns": "int",
+  "timeout_ms": 1000,
+  "tests": [
+    {"input": [[]], "output": 0, "hint": "A soma de uma lista vazia é 0"},
+    {"input": [[7]], "output": 7},
+    {"input": [[1, 2, 3]], "output": 6},
+    {"input": [[-5, 5]], "output": 0},
+    {"input": [[10, -3, 8, 100]], "output": 115}
+  ]
+}

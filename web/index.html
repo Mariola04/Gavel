@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gavel</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Gavel <span>avaliador automático de funções Go</span></h1>
+    <nav class="tabs" role="tablist">
+      <button type="button" class="tab active" data-mode="practice" role="tab">Prática</button>
+      <button type="button" class="tab" data-mode="exam" role="tab">Prova</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Practice mode -->
+    <section id="practice" class="mode">
+      <aside class="sidebar">
+        <div class="filters" id="filters">
+          <button type="button" class="filter active" data-level="">Todos</button>
+          <button type="button" class="filter" data-level="easy">Fácil</button>
+          <button type="button" class="filter" data-level="medium">Médio</button>
+          <button type="button" class="filter" data-level="hard">Difícil</button>
+        </div>
+        <ul class="exercise-list" id="exercise-list"></ul>
+      </aside>
+      <div class="content" id="practice-content">
+        <p class="placeholder">Escolha um exercício da lista.</p>
+      </div>
+    </section>
+
+    <!-- Exam mode -->
+    <section id="exam" class="mode" hidden>
+      <div id="exam-start" class="exam-start">
+        <h2>Iniciar uma prova</h2>
+        <div class="exam-cards" id="exam-cards"></div>
+        <form class="resume" id="resume-form">
+          <label for="resume-id">Retomar uma tentativa</label>
+          <input id="resume-id" placeholder="attempt_id (ex.: 20260926T110200-a1b2c3)" autocomplete="off">
+          <button type="submit">Retomar</button>
+        </form>
+      </div>
+      <div id="exam-attempt" hidden>
+        <div class="attempt-header">
+          <div>
+            <h2 id="attempt-title"></h2>
+            <p class="attempt-id">Tentativa <code id="attempt-id"></code> — guarde este código para retomar a prova.</p>
+          </div>
+          <div class="total" id="attempt-total"></div>
+          <button type="button" class="secondary" id="leave-attempt">Sair da prova</button>
+        </div>
+        <div class="attempt-body">
+          <aside class="sidebar">
+            <table class="score-table" id="score-table">
+              <thead><tr><th>Exercício</th><th>Nível</th><th>Melhor</th><th>Pontos</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </aside>
+          <div class="content" id="exam-content">
+            <p class="placeholder">Escolha um exercício da prova.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <p class="error-banner" id="error" hidden></p>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "title": "N-ésimo primo",
+  "description": "Defina a função Nth(n int) int que devolve o n-ésimo número primo (n >= 1).",
+  "difficulty": "hard",
+  "function": "Nth",
+  "params": ["int"],
+  "returns": "int",
+  "timeout_ms": 2000,
+  "tests": [
+    {"input": [1], "output": 2},
+    {"input": [2], "output": 3},
+    {"input": [6], "output": 13},
+    {"input": [10001], "output": 104743}
+  ]
+}

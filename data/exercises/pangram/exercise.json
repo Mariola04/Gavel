@@ -1,0 +1,21 @@
+{
+  "title": "Pangrama",
+  "description": "Defina a função IsPangram(s string) bool que indica se s contém todas as letras de a a z do alfabeto inglês, ignorando maiúsculas/minúsculas.",
+  "difficulty": "medium",
+  "function": "IsPangram",
+  "params": ["string"],
+  "returns": "bool",
+  "timeout_ms": 1000,
+  "tests": [
+    {"input": [""], "output": false},
+    {"input": ["abcdefghijklmnopqrstuvwxyz"], "output": true},
+    {"input": ["the quick brown fox jumps over the lazy dog"], "output": true},
+    {"input": ["a quick movement of the enemy will jeopardize five gunboats"], "output": false},
+    {"input": ["five boxing wizards jump quickly at it"], "output": false},
+    {"input": ["the_quick_brown_fox_jumps_over_the_lazy_dog"], "output": true},
+    {"input": ["the 1 quick brown fox jumps over the 2 lazy dogs"], "output": true},
+    {"input": ["7h3 qu1ck brown fox jumps ov3r 7h3 lazy dog"], "output": false},
+    {"input": ["\"Five quacking Zephyrs jolt my wax bed.\""], "output": true},
+    {"input": ["abcdefghijklm ABCDEFGHIJKLM"], "output": false}
+  ]
+}

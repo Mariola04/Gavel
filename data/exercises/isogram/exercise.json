@@ -1,0 +1,25 @@
+{
+  "title": "Isograma",
+  "description": "Defina a função IsIsogram(s string) bool que indica se nenhuma letra se repete em s, ignorando maiúsculas/minúsculas, espaços e hífenes.",
+  "difficulty": "medium",
+  "function": "IsIsogram",
+  "params": ["string"],
+  "returns": "bool",
+  "timeout_ms": 1000,
+  "tests": [
+    {"input": [""], "output": true},
+    {"input": ["isogram"], "output": true},
+    {"input": ["eleven"], "output": false},
+    {"input": ["zzyzx"], "output": false},
+    {"input": ["subdermatoglyphic"], "output": true},
+    {"input": ["Alphabet"], "output": false},
+    {"input": ["alphAbet"], "output": false},
+    {"input": ["thumbscrew-japingly"], "output": true},
+    {"input": ["thumbscrew-jappingly"], "output": false},
+    {"input": ["six-year-old"], "output": true},
+    {"input": ["Emily Jung Schwartzkopf"], "output": true},
+    {"input": ["accentor"], "output": false},
+    {"input": ["angola"], "output": false},
+    {"input": ["up-to-date"], "output": false}
+  ]
+}

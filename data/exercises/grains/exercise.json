@@ -1,0 +1,18 @@
+{
+  "title": "Grãos de trigo",
+  "description": "Num tabuleiro de xadrez, a primeira casa tem 1 grão e cada casa seguinte tem o dobro da anterior. Defina a função Square(n int) uint64 que devolve o número de grãos na casa n (1 a 64).",
+  "difficulty": "easy",
+  "function": "Square",
+  "params": ["int"],
+  "returns": "uint64",
+  "timeout_ms": 1000,
+  "tests": [
+    {"input": [1], "output": 1},
+    {"input": [2], "output": 2},
+    {"input": [3], "output": 4},
+    {"input": [4], "output": 8},
+    {"input": [16], "output": 32768},
+    {"input": [32], "output": 2147483648},
+    {"input": [64], "output": 9223372036854775808}
+  ]
+}

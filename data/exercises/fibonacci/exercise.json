@@ -1,0 +1,17 @@
+{
+  "title": "Fibonacci",
+  "description": "Defina a função Fibonacci(n int) int que devolve o n-ésimo número de Fibonacci, com Fibonacci(0) = 0 e Fibonacci(1) = 1.",
+  "difficulty": "medium",
+  "function": "Fibonacci",
+  "params": ["int"],
+  "returns": "int",
+  "timeout_ms": 1000,
+  "tests": [
+    {"input": [0], "output": 0, "hint": "Ver caso base: Fibonacci(0) = 0"},
+    {"input": [1], "output": 1},
+    {"input": [2], "output": 1},
+    {"input": [10], "output": 55},
+    {"input": [20], "output": 6765},
+    {"input": [50], "output": 12586269025, "hint": "Uma solução recursiva ingénua é demasiado lenta; use um ciclo"}
+  ]
+}

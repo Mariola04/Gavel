@@ -1,0 +1,19 @@
+{
+  "title": "Palíndromo",
+  "description": "Defina a função IsPalindrome(s string) bool que indica se s se lê da mesma forma nos dois sentidos, ignorando maiúsculas/minúsculas e tudo o que não seja letra ou dígito.",
+  "difficulty": "easy",
+  "function": "IsPalindrome",
+  "params": ["string"],
+  "returns": "bool",
+  "timeout_ms": 1000,
+  "tests": [
+    {"input": [""], "output": true},
+    {"input": ["a"], "output": true},
+    {"input": ["Ana"], "output": true, "hint": "Ignore maiúsculas/minúsculas"},
+    {"input": ["gavel"], "output": false},
+    {"input": ["Anotaram a data da maratona"], "output": true, "hint": "Ignore espaços"},
+    {"input": ["Roma, amor!"], "output": true, "hint": "Ignore pontuação"},
+    {"input": ["A torre da derrota"], "output": true},
+    {"input": ["ab"], "output": false}
+  ]
+}

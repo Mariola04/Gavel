@@ -1,0 +1,17 @@
+{
+  "title": "Codificação run-length",
+  "description": "Defina a função Encode(s string) string que comprime s substituindo cada sequência de caracteres iguais pelo seu comprimento seguido do caráter (o comprimento é omitido quando é 1). Exemplo: \"AABCCC\" dá \"2AB3C\".",
+  "difficulty": "hard",
+  "function": "Encode",
+  "params": ["string"],
+  "returns": "string",
+  "timeout_ms": 1000,
+  "tests": [
+    {"input": [""], "output": ""},
+    {"input": ["XYZ"], "output": "XYZ"},
+    {"input": ["AABBBCCCC"], "output": "2A3B4C"},
+    {"input": ["WWWWWWWWWWWWBWWWWWWWWWWWWBBBWWWWWWWWWWWWWWWWWWWWWWWWB"], "output": "12WB12W3B24WB"},
+    {"input": ["  hsqq qww  "], "output": "2 hs2q q2w2 "},
+    {"input": ["aabbbcccc"], "output": "2a3b4c"}
+  ]
+}

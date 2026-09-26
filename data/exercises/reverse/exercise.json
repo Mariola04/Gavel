@@ -1,0 +1,16 @@
+{
+  "title": "Inverter texto",
+  "description": "Defina a função Reverse(s string) string que devolve s com os caracteres por ordem inversa. Atenção aos caracteres acentuados.",
+  "difficulty": "easy",
+  "function": "Reverse",
+  "params": ["string"],
+  "returns": "string",
+  "timeout_ms": 1000,
+  "tests": [
+    {"input": [""], "output": ""},
+    {"input": ["a"], "output": "a"},
+    {"input": ["gavel"], "output": "levag"},
+    {"input": ["Olá, mundo"], "output": "odnum ,álO"},
+    {"input": ["ação"], "output": "oãça", "hint": "Inverta runas, não bytes"}
+  ]
+}
