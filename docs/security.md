@@ -19,7 +19,8 @@ importance:
    harness redirects `os.Stdout` to stderr, and every result line carries a
    random nonce passed through an environment variable the student cannot
    read. So whatever the student prints can neither break the harness nor
-   forge results.
+   forge results. See [the harness](pipeline.md#the-harness-how-the-code-is-run)
+   for how it works.
 3. **Resource limits.** Per-test timeout (goroutine + `select`) and a global
    timeout that kills the whole process group; stdout and stderr capped at
    1 MB; clean environment (minimal `PATH` only); a dedicated temporary

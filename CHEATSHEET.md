@@ -83,6 +83,7 @@ Everything Gavel can do, in one page. Details in the [README](README.md) and the
 
 ## Dynamic analysis (code is run)
 - Stage 9, only if stages 1–8 pass. Compiled program runs every test in a temp dir, clean env, Firejail if available.
+- **Harness** = a `main.go` Gavel generates per submission (`internal/engine/harness.go`): reads the tests from stdin, calls the student's function once per test in a goroutine (`recover()` for panics, timer for timeouts), prints one `@@RESULT@@` JSON line per test tagged with a secret nonce. Details: `docs/pipeline.md#the-harness-how-the-code-is-run`.
 - Per test: return value vs expected, time, **timeout**, **panic**, crash, output > 1 MB, unserialisable result.
 - Student prints can't break or fake results (stdout redirected + secret nonce).
 - Verdicts: **passed**, **failed**, **timeout**.

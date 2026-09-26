@@ -23,8 +23,11 @@ arguments of each test and compares the returned value with the expected one.
 ![Gavel evaluation flow: pre-checks, static analysis (limits, parse, ast, gofmt and complexity, go vet and gosec, go build), dynamic analysis (run tests in the sandbox), then the report. Any blocking failure stops the pipeline and goes straight to the report.](docs/Gavel-Flow.excalidraw.png)
 
 Stages run cheapest first and stop at the first blocking failure; every
-outcome produces a saved report. Details in
-[docs/pipeline.md](docs/pipeline.md).
+outcome produces a saved report. To run the tests, Gavel generates a small
+`main` program, the **harness**, that calls the student's function once per
+test, catching panics and timeouts. Details in
+[docs/pipeline.md](docs/pipeline.md) (see
+[the harness](docs/pipeline.md#the-harness-how-the-code-is-run)).
 
 ## Quick start
 
