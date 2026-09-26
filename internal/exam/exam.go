@@ -16,7 +16,8 @@ import (
 	"gavel/internal/exercise"
 )
 
-// Exam is a template that says how many exercises of each level to draw.
+// Exam is a preset: how many exercises of each level to draw. Teachers
+// start exam sessions from a preset or from a custom composition.
 type Exam struct {
 	ID          string                      `json:"id"`
 	Title       string                      `json:"title"`
@@ -55,8 +56,8 @@ func (e *Exam) MaxPoints() int {
 	return total
 }
 
-// Draw picks the exercises for an attempt. The result depends only on the
-// template, the repository and the seed, so an attempt can be reproduced.
+// Draw picks the exercises for a session. The result depends only on the
+// composition, the repository and the seed, so a draw can be reproduced.
 // Levels are disjoint, so no exercise is picked twice.
 func (e *Exam) Draw(repo *exercise.Repository, seed uint64) []string {
 	rng := rand.New(rand.NewPCG(seed, seed)) //nolint:gosec // reproducible draws need a seeded generator
@@ -128,13 +129,13 @@ func (c *Catalog) Get(id string) (*Exam, bool) {
 // List returns every template, easiest first.
 func (c *Catalog) List() []*Exam { return c.sorted }
 
-// Attempt is one student's run of an exam.
+// Attempt is one student's participation in an exam session. Every
+// attempt of a session has the session's exercises.
 type Attempt struct {
 	ID          string    `json:"attempt_id"`
-	ExamID      string    `json:"exam_id"`
+	SessionID   string    `json:"session_id"`
 	Student     string    `json:"student,omitempty"`
 	StartedAt   time.Time `json:"started_at"`
-	Seed        uint64    `json:"seed"`
 	ExerciseIDs []string  `json:"exercise_ids"`
 }
 

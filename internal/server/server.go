@@ -47,10 +47,14 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("GET /api/exercises", h.listExercises)
 	mux.HandleFunc("GET /api/exercises/{id}", h.getExercise)
 	mux.HandleFunc("GET /api/exams", h.listExams)
-	mux.HandleFunc("POST /api/exams/{id}/attempts", h.startAttempt)
+	mux.HandleFunc("GET /api/sessions", h.listSessions)
+	mux.HandleFunc("POST /api/sessions/{id}/join", h.joinSession)
 	mux.HandleFunc("GET /api/attempts/{id}", h.getAttempt)
 	mux.HandleFunc("POST /api/submissions", h.submit)
 	mux.HandleFunc("GET /api/submissions/{id}", h.getReport)
+	mux.HandleFunc("GET /api/admin/sessions", h.requireAdmin(h.adminSessions))
+	mux.HandleFunc("POST /api/admin/sessions", h.requireAdmin(h.createSession))
+	mux.HandleFunc("POST /api/admin/sessions/{id}/close", h.requireAdmin(h.closeSession))
 	mux.HandleFunc("GET /api/admin/submissions", h.requireAdmin(h.adminSubmissions))
 	mux.HandleFunc("GET /api/admin/attempts", h.requireAdmin(h.adminAttempts))
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
@@ -89,14 +93,18 @@ func (h *handler) listExams(w http.ResponseWriter, r *http.Request) {
 	h.respond(w, http.StatusOK, exams, err)
 }
 
-func (h *handler) startAttempt(w http.ResponseWriter, r *http.Request) {
-	// The body is optional: {"student": "..."}.
-	var req client.StartAttemptRequest
-	if !decodeJSON(w, r, &req, true) {
+func (h *handler) listSessions(w http.ResponseWriter, r *http.Request) {
+	list, err := h.client.Sessions(r.Context())
+	h.respond(w, http.StatusOK, list, err)
+}
+
+func (h *handler) joinSession(w http.ResponseWriter, r *http.Request) {
+	var req client.JoinRequest
+	if !decodeJSON(w, r, &req, false) {
 		return
 	}
-	a, err := h.client.StartAttempt(r.Context(), r.PathValue("id"), req.Student)
-	h.respond(w, http.StatusCreated, a, err)
+	a, err := h.client.JoinSession(r.Context(), r.PathValue("id"), req.Student)
+	h.respond(w, http.StatusOK, a, err)
 }
 
 func (h *handler) getAttempt(w http.ResponseWriter, r *http.Request) {
@@ -116,6 +124,25 @@ func (h *handler) submit(w http.ResponseWriter, r *http.Request) {
 func (h *handler) getReport(w http.ResponseWriter, r *http.Request) {
 	report, err := h.client.Report(r.Context(), r.PathValue("id"))
 	h.respond(w, http.StatusOK, report, err)
+}
+
+func (h *handler) adminSessions(w http.ResponseWriter, r *http.Request) {
+	list, err := h.admin.AllSessions(r.Context())
+	h.respond(w, http.StatusOK, list, err)
+}
+
+func (h *handler) createSession(w http.ResponseWriter, r *http.Request) {
+	var req client.CreateSessionRequest
+	if !decodeJSON(w, r, &req, false) {
+		return
+	}
+	s, err := h.admin.CreateSession(r.Context(), req)
+	h.respond(w, http.StatusCreated, s, err)
+}
+
+func (h *handler) closeSession(w http.ResponseWriter, r *http.Request) {
+	s, err := h.admin.CloseSession(r.Context(), r.PathValue("id"))
+	h.respond(w, http.StatusOK, s, err)
 }
 
 func (h *handler) adminSubmissions(w http.ResponseWriter, r *http.Request) {

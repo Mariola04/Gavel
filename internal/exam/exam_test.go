@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"gavel/internal/exercise"
 )
@@ -146,5 +147,97 @@ func TestComputeScore(t *testing.T) {
 	}
 	if sc.Points != 2 || sc.MaxPoints != 6 || math.Abs(sc.Total-2.0/6) > 1e-9 {
 		t.Errorf("score = %v/%v (%v), want 2/6", sc.Points, sc.MaxPoints, sc.Total)
+	}
+}
+
+func TestNewSession(t *testing.T) {
+	repo := testRepo(t, 3)
+	now := time.Date(2026, 9, 26, 10, 0, 0, 0, time.UTC)
+	comp := map[exercise.Difficulty]int{exercise.Easy: 1, exercise.Hard: 2}
+
+	s, err := NewSession(" Prova 1 ", comp, 90*time.Minute, repo, 42, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Title != "Prova 1" || len(s.ExerciseIDs) != 3 || !s.EndsAt.Equal(now.Add(90*time.Minute)) {
+		t.Fatalf("session = %+v", s)
+	}
+	again, _ := NewSession("Prova 1", comp, 90*time.Minute, repo, 42, now)
+	if !slices.Equal(s.ExerciseIDs, again.ExerciseIDs) {
+		t.Errorf("same seed gave different draws: %v vs %v", s.ExerciseIDs, again.ExerciseIDs)
+	}
+
+	for name, tc := range map[string]struct {
+		title    string
+		comp     map[exercise.Difficulty]int
+		duration time.Duration
+		want     string
+	}{
+		"too short":       {"P", comp, 30 * time.Second, "duração"},
+		"too long":        {"P", comp, 9 * time.Hour, "duração"},
+		"no title":        {" ", comp, time.Hour, "title"},
+		"empty":           {"P", nil, time.Hour, "vazia"},
+		"too many hard":   {"P", map[exercise.Difficulty]int{exercise.Hard: 4}, time.Hour, "só existem 3"},
+		"unknown level":   {"P", map[exercise.Difficulty]int{"expert": 1}, time.Hour, "nível inválido"},
+		"negative amount": {"P", map[exercise.Difficulty]int{exercise.Easy: -1}, time.Hour, "positiva"},
+	} {
+		if _, err := NewSession(tc.title, tc.comp, tc.duration, repo, 1, now); err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: error = %v, want %q", name, err, tc.want)
+		}
+	}
+}
+
+func TestSessionOpenAndClose(t *testing.T) {
+	now := time.Date(2026, 9, 26, 10, 0, 0, 0, time.UTC)
+	s := &Session{EndsAt: now.Add(time.Hour)}
+	if !s.Open(now) || s.Open(now.Add(time.Hour)) {
+		t.Fatal("open window is wrong")
+	}
+	s.Close(now.Add(10 * time.Minute))
+	if s.Open(now.Add(10*time.Minute)) || !s.EndsAt.Equal(now.Add(10*time.Minute)) {
+		t.Fatalf("close did not end the session: %v", s.EndsAt)
+	}
+	s.Close(now.Add(30 * time.Minute)) // closing again keeps the original end
+	if !s.EndsAt.Equal(now.Add(10 * time.Minute)) {
+		t.Fatalf("second close moved the end: %v", s.EndsAt)
+	}
+}
+
+func TestNewSessionWithExercises(t *testing.T) {
+	repo := testRepo(t, 3)
+	now := time.Date(2026, 9, 26, 10, 0, 0, 0, time.UTC)
+	picked := []string{"hard-2", "easy-0", "hard-0"}
+
+	s, err := NewSessionWithExercises("Escolhidos", picked, time.Hour, repo, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(s.ExerciseIDs, picked) || s.Seed != 0 {
+		t.Fatalf("exercises = %v (seed %d), want %v in that order", s.ExerciseIDs, s.Seed, picked)
+	}
+	if s.Composition[exercise.Easy] != 1 || s.Composition[exercise.Hard] != 2 || len(s.Composition) != 2 {
+		t.Errorf("composition = %v", s.Composition)
+	}
+	picked[0] = "changed" // the session keeps its own copy
+	if s.ExerciseIDs[0] != "hard-2" {
+		t.Error("session shares the caller's slice")
+	}
+
+	for name, tc := range map[string]struct {
+		title string
+		ids   []string
+		want  string
+	}{
+		"no title":  {" ", []string{"easy-0"}, "title"},
+		"none":      {"P", nil, "pelo menos um"},
+		"unknown":   {"P", []string{"easy-0", "nope"}, "não existe"},
+		"duplicate": {"P", []string{"easy-0", "easy-0"}, "mais do que uma vez"},
+	} {
+		if _, err := NewSessionWithExercises(tc.title, tc.ids, time.Hour, repo, now); err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: error = %v, want %q", name, err, tc.want)
+		}
+	}
+	if _, err := NewSessionWithExercises("P", []string{"easy-0"}, 0, repo, now); err == nil {
+		t.Error("zero duration accepted")
 	}
 }

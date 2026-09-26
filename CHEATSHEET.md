@@ -13,13 +13,13 @@ Everything Gavel can do, in one page. Details in the [README](README.md) and the
 - Students first type a **name / student number** (no password) → saved on every submission and attempt.
 - Options: `-addr host:port`, `-sandbox auto|firejail|none`
 - **Prática**: search/filter exercises, editor (auto-indent, `Tab`, `Ctrl+Enter` submits, drafts auto-saved), report with static + dynamic results.
-- **Prova**: pick an exam → exercises drawn → submit each → live score. Resume with the attempt code (copy button) or "Continuar a última".
+- **Prova**: lists the exams the teacher opened (countdown) → **Entrar na prova** → same exercises for everyone → submit each → live score. Editor locks when time ends. Joining again with the same name resumes.
 - Links are shareable: `#/exercicio/<id>`, `#/prova/<attempt_id>`, `#/docente`.
 
 ## Teacher area ("Docente" tab)
 - Enable: `GAVEL_ADMIN_PASSWORD='choose-a-password' ./bin/gavel serve` (no env var → disabled). Never hardcoded.
-- Log in on the **Docente** tab → totals + tabs **Submissões** (filter by student/exercise/attempt/verdict, click → code + full report), **Tentativas** (grade per attempt), **Alunos** (solved, best exam, last activity). Optional auto-refresh (15 s).
-- API: `GET /api/admin/submissions`, `GET /api/admin/attempts` with header `Authorization: Bearer <password>` (401 wrong, 404 disabled).
+- Log in on the **Docente** tab → totals + tabs **Provas** (open an exam: title, duration in minutes, and a preset, a custom count per level, or **pick the exact exercises**; follow time left and students; *Terminar agora*), **Submissões** (filter by student/exercise/attempt/verdict, click → code + full report), **Tentativas** (grade per attempt), **Alunos** (solved, best exam, last activity). Optional auto-refresh (15 s).
+- API: `GET/POST /api/admin/sessions`, `POST /api/admin/sessions/{id}/close`, `GET /api/admin/submissions`, `GET /api/admin/attempts` with header `Authorization: Bearer <password>` (401 wrong, 404 disabled).
 
 ## Other laptops (class on a network)
 - Default is **localhost only** (spec). To open it up: `./bin/gavel serve -addr 0.0.0.0:8080`
@@ -32,8 +32,9 @@ Everything Gavel can do, in one page. Details in the [README](README.md) and the
 |----|---------|
 | List exercises | `./bin/gavel exercises [-difficulty easy\|medium\|hard]` |
 | Show one (signature, test inputs, skeleton) | `./bin/gavel show <id>` |
-| List exams | `./bin/gavel exams` |
-| Start an exam | `./bin/gavel start [-student <name>] <exam_id>` → prints `attempt_id` |
+| List exam presets | `./bin/gavel exams` |
+| List open exams | `./bin/gavel sessions` |
+| Join an exam | `./bin/gavel join -student <name> <session_id>` → prints `attempt_id` |
 | Submit (practice) | `./bin/gavel submit [-student <name>] <exercise_id> file.go` |
 | Submit (exam) | `./bin/gavel submit -attempt <attempt_id> <exercise_id> file.go` |
 | Attempt score | `./bin/gavel attempt <attempt_id>` |
@@ -51,11 +52,13 @@ Everything Gavel can do, in one page. Details in the [README](README.md) and the
 |--------|-------|------|
 | GET | `/api/exercises[?difficulty=easy]` | list |
 | GET | `/api/exercises/{id}` | detail (no expected outputs) |
-| GET | `/api/exams` | exam templates |
-| POST | `/api/exams/{id}/attempts` | start attempt (201); body `{"student"?}` |
+| GET | `/api/exams` | exam presets |
+| GET | `/api/sessions` | open exams |
+| POST | `/api/sessions/{id}/join` | `{"student"}` → attempt (same one if joined before) |
 | GET | `/api/attempts/{id}` | attempt + score |
 | POST | `/api/submissions` | `{"exercise_id","code","attempt_id"?,"student"?}` → report |
 | GET | `/api/submissions/{id}` | saved report |
+| GET/POST | `/api/admin/sessions` · POST `…/{id}/close` | teacher: list, open, close exams (password) |
 | GET | `/api/admin/submissions` · `/api/admin/attempts` | teacher listings (password) |
 
 - Errors: `{"error": "..."}` with 400 / 404 / 413 / 500.
@@ -86,18 +89,20 @@ Everything Gavel can do, in one page. Details in the [README](README.md) and the
 ## Scoring
 - Submission score = tests passed ÷ total (7/10 → **70%**). Rejected/compile errors → 0.
 - Exam: best submission per exercise × level points (easy 1, medium 2, hard 3); total = points ÷ max.
-- Exams: `easy` (2E+1M, 4 pts), `medium` (1E+2M+1H, 8 pts), `hard` (1M+3H, 11 pts).
+- Presets: `easy` (2E+1M, 4 pts), `medium` (1E+2M+1H, 8 pts), `hard` (1M+3H, 11 pts); the teacher can also set a custom count per level, or pick the exact exercises.
+- Exams are a **fixed time window** set by the teacher; after it ends (or *Terminar agora*) joins and submissions are refused.
 
 ## Content
 - **Add an exercise**: `data/exercises/<id>/exercise.json` + `solution.go` → `make test` (reference solution must pass its own tests). Optional `param_names` for nicer signatures.
-- **Add an exam**: `data/exams/<id>.json` with `title`, `description`, `composition` → validated at startup.
+- **Add an exam preset**: `data/exams/<id>.json` with `title`, `description`, `composition` → validated at startup. Exams themselves are opened in the Docente area.
 - 21 exercises (8 easy, 7 medium, 6 hard); 16 converted from Exercism (MIT).
 
 ## Where things are saved
 - Reports: `data/reports/<submission_id>.json`
-- Attempts: `data/attempts/<attempt_id>.json` (includes the draw seed → reproducible)
+- Exam sessions: `data/sessions/<session_id>.json` (exercises + draw seed → reproducible)
+- Attempts: `data/attempts/<attempt_id>.json` (student + session)
 - Build cache: `data/.cache/` (safe to delete; slower first build)
-- All three are gitignored.
+- All of these are gitignored.
 
 ## Development & tests
 | Do | Command |

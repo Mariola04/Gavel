@@ -52,15 +52,20 @@ func (c *RemoteClient) Exercise(ctx context.Context, id string) (*ExerciseDetail
 	return call[*ExerciseDetail](ctx, c, http.MethodGet, "/api/exercises/"+url.PathEscape(id), nil)
 }
 
-// Exams lists the exam templates.
+// Exams lists the exam presets.
 func (c *RemoteClient) Exams(ctx context.Context) ([]*exam.Exam, error) {
 	return call[[]*exam.Exam](ctx, c, http.MethodGet, "/api/exams", nil)
 }
 
-// StartAttempt starts a new attempt of an exam.
-func (c *RemoteClient) StartAttempt(ctx context.Context, examID, student string) (*AttemptView, error) {
-	body := StartAttemptRequest{Student: student}
-	return call[*AttemptView](ctx, c, http.MethodPost, "/api/exams/"+url.PathEscape(examID)+"/attempts", body)
+// Sessions lists the open exam sessions.
+func (c *RemoteClient) Sessions(ctx context.Context) ([]SessionView, error) {
+	return call[[]SessionView](ctx, c, http.MethodGet, "/api/sessions", nil)
+}
+
+// JoinSession joins an exam session, or resumes the student's attempt.
+func (c *RemoteClient) JoinSession(ctx context.Context, sessionID, student string) (*AttemptView, error) {
+	body := JoinRequest{Student: student}
+	return call[*AttemptView](ctx, c, http.MethodPost, "/api/sessions/"+url.PathEscape(sessionID)+"/join", body)
 }
 
 // Attempt returns an attempt with its current score.

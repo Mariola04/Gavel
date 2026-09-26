@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"gavel/internal/client"
@@ -92,18 +93,37 @@ func cmdExams(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 	return nil
 }
 
-func cmdStart(ctx context.Context, args []string, stdout, stderr io.Writer) error {
-	fs := newFlags("start", stderr)
-	student := fs.String("student", "", "nome do aluno (opcional)")
-	pos, err := parseArgs(fs, args, "<exam_id>")
-	if err != nil {
+func cmdSessions(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if _, err := parseArgs(newFlags("sessions", stderr), args); err != nil {
 		return err
 	}
 	c, err := newClient()
 	if err != nil {
 		return err
 	}
-	a, err := c.StartAttempt(ctx, pos[0], *student)
+	sessions, err := c.Sessions(ctx)
+	if err != nil {
+		return err
+	}
+	printSessions(stdout, sessions)
+	return nil
+}
+
+func cmdJoin(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	fs := newFlags("join", stderr)
+	student := fs.String("student", "", "nome do aluno (obrigatório)")
+	pos, err := parseArgs(fs, args, "<session_id>")
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(*student) == "" {
+		return fmt.Errorf("%w: join precisa de -student <nome>", errUsage)
+	}
+	c, err := newClient()
+	if err != nil {
+		return err
+	}
+	a, err := c.JoinSession(ctx, pos[0], *student)
 	if err != nil {
 		return err
 	}

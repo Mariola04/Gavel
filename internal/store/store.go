@@ -20,7 +20,7 @@ import (
 	"gavel/internal/exam"
 )
 
-// ErrNotFound is returned when a report or attempt does not exist.
+// ErrNotFound is returned when a report, attempt or session does not exist.
 var ErrNotFound = errors.New("não encontrado")
 
 // idPattern matches ids produced by NewID. Checking it before building a
@@ -41,6 +41,7 @@ func NewID(now time.Time) (string, error) {
 type Store struct {
 	reportsDir  string
 	attemptsDir string
+	sessionsDir string
 }
 
 // New creates the reports and attempts directories under dataDir.
@@ -48,8 +49,9 @@ func New(dataDir string) (*Store, error) {
 	s := &Store{
 		reportsDir:  filepath.Join(dataDir, "reports"),
 		attemptsDir: filepath.Join(dataDir, "attempts"),
+		sessionsDir: filepath.Join(dataDir, "sessions"),
 	}
-	for _, dir := range []string{s.reportsDir, s.attemptsDir} {
+	for _, dir := range []string{s.reportsDir, s.attemptsDir, s.sessionsDir} {
 		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return nil, fmt.Errorf("criar diretoria %s: %w", dir, err)
 		}
@@ -133,6 +135,37 @@ func (s *Store) Attempts() ([]*exam.Attempt, error) {
 		attempts = append(attempts, a)
 	}
 	return attempts, nil
+}
+
+// SaveSession writes an exam session.
+func (s *Store) SaveSession(sess *exam.Session) error {
+	return save(s.sessionsDir, sess.ID, sess)
+}
+
+// Session reads an exam session.
+func (s *Store) Session(id string) (*exam.Session, error) {
+	var sess exam.Session
+	if err := load(s.sessionsDir, id, &sess); err != nil {
+		return nil, err
+	}
+	return &sess, nil
+}
+
+// Sessions returns every saved session, oldest first.
+func (s *Store) Sessions() ([]*exam.Session, error) {
+	ids, err := listIDs(s.sessionsDir)
+	if err != nil {
+		return nil, fmt.Errorf("listar provas: %w", err)
+	}
+	sessions := make([]*exam.Session, 0, len(ids))
+	for _, id := range ids {
+		sess, err := s.Session(id)
+		if err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, sess)
+	}
+	return sessions, nil
 }
 
 // listIDs returns the ids of the JSON files in dir. Ids start with a

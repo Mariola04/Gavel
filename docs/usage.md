@@ -34,8 +34,9 @@ export PATH="$PATH:$(go env GOPATH)/bin"   # add this line to ~/.bashrc to keep 
 ```
 ./bin/gavel exercises [-difficulty easy]          # table: Id | Level | Title | Description
 ./bin/gavel show <id>                             # exercise details
-./bin/gavel exams                                 # list exam templates
-./bin/gavel start [-student <name>] <exam_id>     # start an attempt, show attempt_id and exercises
+./bin/gavel exams                                 # list exam presets (used by the teacher)
+./bin/gavel sessions                              # list the exams the teacher has open
+./bin/gavel join -student <name> <session_id>     # join an exam (or resume your attempt)
 ./bin/gavel submit [-attempt <id>] [-student <name>] <exercise_id> <file.go>
 ./bin/gavel attempt <attempt_id>                  # attempt score
 ./bin/gavel report <submission_id>                # saved report
@@ -53,13 +54,17 @@ export SERVER=http://localhost:8080
 ./bin/gavel exercises -difficulty hard
 ```
 
-An exam example:
+An exam example (the teacher has opened the exam in the web Docente area):
 
 ```sh
-./bin/gavel start easy                          # shows the attempt_id and the drawn exercises
+./bin/gavel sessions                            # shows the session_id and the time left
+./bin/gavel join -student "Ana" <session_id>    # shows the attempt_id and the exercises
 ./bin/gavel submit -attempt <attempt_id> leap leap.go
-./bin/gavel attempt <attempt_id>                # current score
+./bin/gavel attempt <attempt_id>                # current score and time left
 ```
+
+Exams are opened from the web interface only, because it needs the teacher
+password.
 
 ## Using Gavel from other devices
 

@@ -25,8 +25,9 @@ analysis** (reported in `dynamic.tests`).
 | 8 | `build` — `go build`, `CGO_ENABLED=0` | yes | `compile_error` |
 | 9 | execution | — | `passed`, `failed` or `timeout` |
 
-Stages 4 and 5 run in parallel, as do 6 and 7. An unknown exercise, or one
-outside the attempt, is refused before the pipeline (HTTP 404/400).
+Stages 4 and 5 run in parallel, as do 6 and 7. An unknown exercise, one
+outside the attempt, or a submission to an exam that has ended is refused
+before the pipeline (HTTP 404/400).
 
 ## Dynamic analysis
 

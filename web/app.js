@@ -157,7 +157,9 @@ const state = {
   student: storage.get("gavel:student", ""),
   // Admin password, kept only for this browser tab.
   adminToken: sessionGet("gavel:admin"),
-  admin: { tab: "submissions", query: "", verdict: "", submissions: [], attempts: [], timer: null },
+  admin: { tab: "sessions", query: "", verdict: "", attemptsQuery: "", sessions: [], submissions: [], attempts: [], timer: null },
+  attemptDeadline: 0,
+  sessionsTimer: null,
 };
 
 // Browser storage is per browser, so progress and drafts are keyed by student.
@@ -219,13 +221,12 @@ async function route() {
 
   if (!r.attemptId) {
     showSidebar(false);
-    renderExamStart();
+    renderOpenSessions();
     return;
   }
   if (!state.attempt || state.attempt.attempt_id !== r.attemptId) {
     try {
-      state.attempt = await api("GET", `/api/attempts/${encodeURIComponent(r.attemptId)}`);
-      storage.set(studentKey("last-attempt"), r.attemptId);
+      setAttempt(await api("GET", `/api/attempts/${encodeURIComponent(r.attemptId)}`));
     } catch (err) {
       toast(err.message, "error");
       go("prova");
@@ -354,56 +355,120 @@ function renderWelcome() {
 // Exam: start page and attempt sidebar
 // ============================================================
 
-function renderExamStart() {
-  const lastAttempt = storage.get(studentKey("last-attempt"), null);
-  const idInput = el("input", { class: "input", placeholder: "20260926T110200-a1b2c3", "aria-label": "Código da tentativa", autocomplete: "off" });
+// ============================================================
+// Countdowns (exam time limits)
+// ============================================================
 
-  const cards = state.exams.map((exam) => {
-    const segments = LEVELS.flatMap((level) => Array.from({ length: exam.composition[level] || 0 }, () => el("span", { class: level })));
-    const total = LEVELS.reduce((sum, level) => sum + (exam.composition[level] || 0), 0);
-    const points = LEVELS.reduce((sum, level) => sum + (exam.composition[level] || 0) * LEVEL_POINTS[level], 0);
+// deadlineOf turns the server's remaining_seconds into a local timestamp,
+// so countdowns do not depend on both clocks agreeing.
+const deadlineOf = (view) => Date.now() + view.remaining_seconds * 1000;
+
+function fmtRemaining(ms) {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  return h ? `${h} h ${String(m).padStart(2, "0")} min` : `${m}:${String(sec).padStart(2, "0")}`;
+}
+
+const fmtClock = (iso) => new Date(iso).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+
+// countdown is an element that the ticker below keeps up to date.
+function countdown(deadline, done = "terminada") {
+  return el("span", { class: "countdown", "data-deadline": String(deadline), "data-done": done }, fmtRemaining(deadline - Date.now()));
+}
+
+function tickCountdowns() {
+  for (const node of document.querySelectorAll("[data-deadline]")) {
+    const left = Number(node.dataset.deadline) - Date.now();
+    node.textContent = left > 0 ? fmtRemaining(left) : node.dataset.done;
+  }
+  // When the exam time runs out, lock the editor without waiting for a reload.
+  if (state.attempt?.open && Date.now() >= state.attemptDeadline) {
+    state.attempt.open = false;
+    toast("O tempo da prova terminou. Já não é possível submeter.", "error");
+    if (parseRoute().mode === "exam") route();
+  }
+}
+
+function setAttempt(attempt) {
+  state.attempt = attempt;
+  state.attemptDeadline = deadlineOf(attempt);
+  storage.set(studentKey("last-attempt"), attempt.attempt_id);
+}
+
+// ============================================================
+// Exam: open sessions and the student's attempt
+// ============================================================
+
+function compositionPills(composition) {
+  return el("div", { class: "meta" }, LEVELS.filter((level) => composition[level]).map((level) =>
+    el("span", { class: `pill ${level}` }, `${composition[level]} × ${LEVEL_LABELS[level].toLowerCase()}`)));
+}
+
+function compositionFacts(composition) {
+  const total = LEVELS.reduce((sum, level) => sum + (composition[level] || 0), 0);
+  const points = LEVELS.reduce((sum, level) => sum + (composition[level] || 0) * LEVEL_POINTS[level], 0);
+  return { total, points };
+}
+
+async function renderOpenSessions() {
+  let sessions;
+  try {
+    sessions = (await api("GET", "/api/sessions")) || [];
+  } catch (err) {
+    $("main").replaceChildren(el("div", { class: "page" }, el("div", { class: "results-empty" },
+      icon("alert", 28), el("strong", {}, "Não foi possível carregar as provas"), err.message)));
+    return;
+  }
+  const r = parseRoute();
+  if (r.mode !== "exam" || r.attemptId) return; // the student moved on meanwhile
+
+  const lastAttempt = storage.get(studentKey("last-attempt"), null);
+  const cards = sessions.map((s) => {
+    const { total, points } = compositionFacts(s.composition);
     return el("div", { class: "card exam-card" },
-      el("h2", {}, exam.title),
-      el("p", {}, exam.description),
-      el("div", { class: "exam-bar", "aria-hidden": "true" }, segments),
-      el("div", { class: "meta" }, LEVELS.filter((level) => exam.composition[level]).map((level) =>
-        el("span", { class: `pill ${level}` }, `${exam.composition[level]} × ${LEVEL_LABELS[level].toLowerCase()}`))),
+      el("div", { class: "exam-card-top" },
+        el("h2", {}, s.title),
+        el("span", { class: "pill tone-ok" }, "Aberta")),
+      el("div", { class: "exam-bar", "aria-hidden": "true" },
+        LEVELS.flatMap((level) => Array.from({ length: s.composition[level] || 0 }, () => el("span", { class: level })))),
+      compositionPills(s.composition),
       el("div", { class: "exam-facts" },
         el("span", {}, el("strong", {}, total), " exercícios"),
         el("span", {}, el("strong", {}, points), " pontos")),
-      el("button", { type: "button", class: "btn btn-primary", onclick: (event) => startAttempt(exam.id, event.currentTarget) },
-        icon("play", 14), "Iniciar prova"));
+      el("p", { class: "exam-time" }, icon("clock", 14), `Termina às ${fmtClock(s.ends_at)} · faltam `, countdown(deadlineOf(s))),
+      el("button", { type: "button", class: "btn btn-primary", onclick: (event) => joinSession(s.session_id, event.currentTarget) },
+        icon("play", 14), "Entrar na prova"));
   });
 
   $("main").replaceChildren(el("div", { class: "page" },
     el("div", { class: "page-head" },
       el("h1", {}, "Provas"),
-      el("p", {}, "Cada prova sorteia exercícios de vários níveis. Pode submeter cada exercício as vezes que quiser: conta a melhor submissão, pesada pelos pontos do nível.")),
-    el("div", { class: "exam-grid" }, cards),
-    el("div", { class: "card resume" },
+      el("p", {}, "O docente abre as provas e define o tempo. Todos recebem os mesmos exercícios. Pode submeter cada um as vezes que quiser: conta a melhor submissão, pesada pelos pontos do nível.")),
+    cards.length ? el("div", { class: "exam-grid" }, cards)
+      : el("div", { class: "results-empty" }, icon("clock", 28), el("strong", {}, "Não há provas abertas"),
+        "Quando o docente abrir uma prova, ela aparece aqui automaticamente."),
+    lastAttempt ? el("div", { class: "card resume" },
       el("div", { class: "resume-text" },
-        el("h3", {}, "Retomar uma tentativa"),
-        el("p", {}, "Introduza o código que recebeu ao iniciar a prova.")),
-      el("form", {
-        onsubmit: (event) => {
-          event.preventDefault();
-          const id = idInput.value.trim();
-          if (id) go("prova", id);
-        },
-      }, idInput, el("button", { type: "submit", class: "btn btn-ghost" }, "Retomar")),
-      lastAttempt ? el("button", { type: "button", class: "btn btn-ghost", onclick: () => go("prova", lastAttempt) },
-        "Continuar a última") : null),
+        el("h3", {}, "A sua última prova"),
+        el("p", {}, "Veja os exercícios e a nota, ou continue se ainda estiver aberta.")),
+      el("button", { type: "button", class: "btn btn-ghost", onclick: () => go("prova", lastAttempt) }, "Abrir")) : null,
   ));
+  // Refresh the list while the student waits on it.
+  clearTimeout(state.sessionsTimer);
+  state.sessionsTimer = setTimeout(() => {
+    const now = parseRoute();
+    if (now.mode === "exam" && !now.attemptId && state.student) renderOpenSessions();
+  }, 10000);
 }
 
-async function startAttempt(examId, button) {
+async function joinSession(sessionId, button) {
   button.disabled = true;
   try {
-    const attempt = await api("POST", `/api/exams/${encodeURIComponent(examId)}/attempts`, { student: state.student });
-    state.attempt = attempt;
-    storage.set(studentKey("last-attempt"), attempt.attempt_id);
-    toast("Prova iniciada. Guarde o código da tentativa para a poder retomar.", "success");
-    go("prova", attempt.attempt_id);
+    setAttempt(await api("POST", `/api/sessions/${encodeURIComponent(sessionId)}/join`, { student: state.student }));
+    toast("Entrou na prova. Boa sorte!", "success");
+    go("prova", state.attempt.attempt_id);
   } catch (err) {
     toast(err.message, "error");
     button.disabled = false;
@@ -429,8 +494,11 @@ function renderAttemptSidebar(selectedId) {
         el("div", { class: "ring", style: `--value: ${Math.round(score.total * 100)}`, role: "img", "aria-label": `Pontuação ${pct(score.total)}` },
           el("span", {}, pct(score.total))),
         el("div", {},
-          el("h2", {}, a.exam_title || a.exam_id),
+          el("h2", {}, a.title),
           el("p", {}, `${fmtPoints(score.points)} de ${score.max_points} pontos`))),
+      a.open
+        ? el("div", { class: "time-box" }, icon("clock", 15), el("span", {}, "Tempo restante"), countdown(state.attemptDeadline, "0:00"))
+        : el("div", { class: "time-box ended" }, icon("alert", 15), el("span", {}, `Prova terminada às ${fmtClock(a.ends_at)}`)),
       el("div", { class: "attempt-id", title: "Código da tentativa" },
         el("span", {}, a.attempt_id),
         el("button", { type: "button", class: "btn btn-ghost btn-sm btn-icon", title: "Copiar código", "aria-label": "Copiar código", onclick: copy }, icon("copy", 14))),
@@ -477,10 +545,15 @@ async function renderWorkspace({ exerciseId, scope }) {
   }
 
   const results = el("section", { class: "results", "aria-live": "polite" });
-  const editor = createEditor(ex, scope, (code, button) => submit(ex, scope, code, button, results));
+  const locked = scope !== "practice" && state.attempt?.attempt_id === scope && !state.attempt.open;
+  const editor = createEditor(ex, scope, (code, button) => submit(ex, scope, code, button, results), locked);
   const reportKey = `${scope}/${ex.id}`;
   if (state.reports.has(reportKey)) showReport(results, state.reports.get(reportKey), ex);
-  else showEmptyResults(results);
+  else if (locked) {
+    results.replaceChildren(el("div", { class: "results-empty" }, icon("clock", 26),
+      el("strong", {}, "A prova terminou"),
+      el("span", {}, "Já não é possível submeter. A nota final está na barra lateral.")));
+  } else showEmptyResults(results);
 
   const examples = ex.tests.slice(0, 6).map((t) =>
     el("code", { class: "example", title: `${ex.function}(${t.input.map((v) => JSON.stringify(v)).join(", ")})` },
@@ -508,7 +581,7 @@ async function renderWorkspace({ exerciseId, scope }) {
 
 // createEditor returns a code editor with line numbers, auto-indent and
 // Ctrl+Enter to submit.
-function createEditor(ex, scope, onSubmit) {
+function createEditor(ex, scope, onSubmit, locked = false) {
   const key = draftKey(scope, ex.id);
   const textarea = el("textarea", {
     spellcheck: "false",
@@ -583,12 +656,19 @@ function createEditor(ex, scope, onSubmit) {
   }, icon("reset", 13), "Repor");
 
   refresh();
+  if (locked) {
+    submitButton.disabled = true;
+    submitButton.title = "A prova terminou";
+    textarea.readOnly = true;
+  }
   return el("div", { class: "editor" },
     el("div", { class: "editor-bar" },
       el("span", { class: "editor-file" }, icon("file", 14), "solution.go", el("span", { class: "sig" }, `— ${ex.signature}`)),
       reset, submitButton),
     el("div", { class: "editor-body" }, gutter, textarea),
-    el("div", { class: "editor-foot" }, el("span", {}, "Go · tabs · rascunho guardado automaticamente"), position));
+    el("div", { class: "editor-foot" },
+      el("span", {}, locked ? "Prova terminada: o código já não pode ser submetido" : "Go · tabs · rascunho guardado automaticamente"),
+      position));
 }
 
 async function submit(ex, scope, code, button, results) {
@@ -609,7 +689,7 @@ async function submit(ex, scope, code, button, results) {
       storage.set(studentKey("best"), best);
       renderPracticeSidebar(ex.id);
     } else if (state.attempt && state.attempt.attempt_id === scope) {
-      state.attempt = await api("GET", `/api/attempts/${encodeURIComponent(scope)}`);
+      setAttempt(await api("GET", `/api/attempts/${encodeURIComponent(scope)}`));
       renderAttemptSidebar(ex.id);
     }
   } catch (err) {
@@ -795,19 +875,20 @@ function verdictPill(verdict) {
 
 const fmtDate = (iso) => new Date(iso).toLocaleString("pt-PT", { dateStyle: "short", timeStyle: "medium" });
 const exerciseTitle = (id) => state.exercises.find((e) => e.id === id)?.title || id;
-const examTitle = (id) => state.exams.find((e) => e.id === id)?.title || id;
 const anonymous = (name) => name || "(anónimo)";
 
-function adminApi(path) {
-  return api("GET", path, undefined, { Authorization: `Bearer ${state.adminToken}` });
+function adminApi(path, method = "GET", body = undefined) {
+  return api(method, path, body, { Authorization: `Bearer ${state.adminToken}` });
 }
 
 async function loadAdminData() {
-  const [submissions, attempts] = await Promise.all([
+  const [sessions, submissions, attempts] = await Promise.all([
+    adminApi("/api/admin/sessions"),
     adminApi("/api/admin/submissions"),
     adminApi("/api/admin/attempts"),
   ]);
   // Newest first.
+  state.admin.sessions = sessions.reverse();
   state.admin.submissions = submissions.reverse();
   state.admin.attempts = attempts.reverse();
 }
@@ -860,7 +941,8 @@ function renderAdminDashboard() {
   const students = new Set(subs.map((s) => s.student || "").concat(a.attempts.map((t) => t.student || "")));
   const passed = subs.filter((s) => s.verdict === "passed").length;
 
-  const tabs = [["submissions", "Submissões"], ["attempts", "Tentativas"], ["students", "Alunos"]];
+  const openSessions = a.sessions.filter((x) => x.open).length;
+  const tabs = [["sessions", "Provas"], ["submissions", "Submissões"], ["attempts", "Tentativas"], ["students", "Alunos"]];
   const autoRefresh = el("input", { type: "checkbox" });
   autoRefresh.checked = Boolean(a.autoRefresh);
   autoRefresh.addEventListener("change", () => {
@@ -890,7 +972,7 @@ function renderAdminDashboard() {
           },
         }, icon("exit", 13), "Terminar sessão"))),
     el("div", { class: "stats" },
-      [[subs.length, "submissões"], [students.size, "alunos"], [a.attempts.length, "tentativas de prova"],
+      [[openSessions, "provas abertas"], [subs.length, "submissões"], [students.size, "alunos"],
         [subs.length ? pct(passed / subs.length) : "—", "submissões aprovadas"]]
         .map(([value, label]) => el("div", { class: "card stat" }, el("span", { class: "stat-value" }, value), el("span", { class: "stat-label" }, label)))),
     el("div", { class: "admin-toolbar" },
@@ -917,7 +999,8 @@ async function refreshAdmin() {
 
 function renderAdminTab(content) {
   const a = state.admin;
-  if (a.tab === "attempts") content.replaceChildren(attemptsTable());
+  if (a.tab === "sessions") content.replaceChildren(...sessionsPanel());
+  else if (a.tab === "attempts") content.replaceChildren(attemptsTable());
   else if (a.tab === "students") content.replaceChildren(studentsTable());
   else content.replaceChildren(submissionsTable());
 }
@@ -969,23 +1052,228 @@ function submissionsTable() {
 }
 
 function attemptsTable() {
-  const rows = state.admin.attempts.map((t) => {
-    const submitted = t.score.exercises.filter((e) => e.submissions > 0).length;
-    return el("tr", { tabindex: "0", title: "Ver as submissões desta tentativa", onclick: () => showSubmissionsFor(t.attempt_id), onkeydown: (e) => e.key === "Enter" && showSubmissionsFor(t.attempt_id) },
-      el("td", { class: "nowrap" }, fmtDate(t.started_at)),
-      el("td", {}, anonymous(t.student)),
-      el("td", {}, t.exam_title || examTitle(t.exam_id)),
-      el("td", { class: "mono" }, t.attempt_id),
-      el("td", { class: "num" }, `${submitted}/${t.exercise_ids.length}`),
-      el("td", { class: "num" }, `${fmtPoints(t.score.points)} / ${t.score.max_points}`),
-      el("td", {}, el("div", { class: "score-cell" },
-        el("span", { class: "mini-bar" }, el("span", { style: `width: ${t.score.total * 100}%` })),
-        el("strong", {}, pct(t.score.total)))));
+  const a = state.admin;
+  const search = el("input", { class: "input", type: "search", placeholder: "Filtrar por aluno, prova ou código…", value: a.attemptsQuery, "aria-label": "Filtrar tentativas" });
+  const body = el("tbody", {});
+  const count = el("span", { class: "muted-text" });
+  function fill() {
+    const q = a.attemptsQuery.trim().toLowerCase();
+    const rows = a.attempts.filter((t) => !q || [t.student, t.title, t.session_id, t.attempt_id].some((v) => (v || "").toLowerCase().includes(q)));
+    count.textContent = plural(rows.length, "tentativa", "tentativas");
+    body.replaceChildren(...(rows.length ? rows.map((t) => {
+      const submitted = t.score.exercises.filter((e) => e.submissions > 0).length;
+      return el("tr", { tabindex: "0", title: "Ver as submissões desta tentativa", onclick: () => showSubmissionsFor(t.attempt_id), onkeydown: (e) => e.key === "Enter" && showSubmissionsFor(t.attempt_id) },
+        el("td", { class: "nowrap" }, fmtDate(t.started_at)),
+        el("td", {}, anonymous(t.student)),
+        el("td", {}, t.title || t.session_id),
+        el("td", {}, t.open ? el("span", { class: "pill tone-ok" }, "a decorrer") : el("span", { class: "pill" }, "terminada")),
+        el("td", { class: "num" }, `${submitted}/${t.exercise_ids.length}`),
+        el("td", { class: "num" }, `${fmtPoints(t.score.points)} / ${t.score.max_points}`),
+        el("td", {}, el("div", { class: "score-cell" },
+          el("span", { class: "mini-bar" }, el("span", { style: `width: ${t.score.total * 100}%` })),
+          el("strong", {}, pct(t.score.total)))));
+    }) : [el("tr", {}, el("td", { colspan: "7", class: "empty-cell" }, "Nenhuma tentativa."))]));
+  }
+  search.addEventListener("input", () => { a.attemptsQuery = search.value; fill(); });
+  fill();
+  return el("div", { class: "card table-card" },
+    el("div", { class: "table-filters" }, search, count),
+    el("div", { class: "table-wrap" }, el("table", { class: "data" },
+      el("thead", {}, el("tr", {}, ["Início", "Aluno", "Prova", "Estado", "Exercícios submetidos", "Pontos", "Nota"].map((h) => el("th", {}, h)))),
+      body)));
+}
+
+// ------------------------------------------------------------
+// Admin: exam sessions (create, follow, close)
+// ------------------------------------------------------------
+
+function sessionsPanel() {
+  return [newSessionForm(), sessionsTable()];
+}
+
+function newSessionForm() {
+  const available = Object.fromEntries(LEVELS.map((level) => [level, state.exercises.filter((e) => e.difficulty === level).length]));
+  const first = state.exams[0];
+  const title = el("input", { class: "input", id: "new-title", value: first ? first.title : "", maxlength: "80", required: true });
+  const preset = el("select", { class: "input select", id: "new-preset" },
+    state.exams.map((e) => el("option", { value: e.id }, e.title)),
+    el("option", { value: "custom" }, "Personalizada (sorteio)"),
+    el("option", { value: "pick" }, "Escolher exercícios"));
+  const counts = Object.fromEntries(LEVELS.map((level) => [level, el("input", {
+    class: "input num-input", id: `new-${level}`, type: "number", min: "0", max: String(available[level]),
+    value: String(first?.composition[level] || 0),
+  })]));
+  const duration = el("input", { class: "input num-input", id: "new-duration", type: "number", min: "1", max: "480", value: "60", required: true });
+  const summary = el("p", { class: "form-summary" });
+  const intro = el("p", { class: "muted-text" });
+  const button = el("button", { type: "submit", class: "btn btn-primary" }, icon("play", 14), "Abrir prova");
+
+  // Picked exercises, in the order of the list (by level, then title).
+  const picked = new Set();
+  const picker = exercisePicker(picked, updateSummary);
+  const countFields = LEVELS.map((level) => el("label", { class: "field", for: `new-${level}` },
+    el("span", {}, el("span", { class: `dot ${level}` }), ` ${LEVEL_LABELS[level]} (máx. ${available[level]})`), counts[level]));
+
+  const picking = () => preset.value === "pick";
+  const pickedIDs = () => state.exercises.filter((e) => picked.has(e.id)).map((e) => e.id);
+  const composition = () => {
+    if (picking()) {
+      const comp = {};
+      for (const id of picked) {
+        const level = state.exercises.find((e) => e.id === id)?.difficulty;
+        if (level) comp[level] = (comp[level] || 0) + 1;
+      }
+      return comp;
+    }
+    return Object.fromEntries(LEVELS.map((level) => [level, Number(counts[level].value) || 0]).filter(([, n]) => n > 0));
+  };
+  function updateSummary() {
+    const { total, points } = compositionFacts(composition());
+    const minutes = Number(duration.value) || 0;
+    const ends = new Date(Date.now() + minutes * 60000).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+    summary.textContent = `${plural(total, "exercício", "exercícios")} · ${plural(points, "ponto", "pontos")} · ${minutes} min, termina às ${ends}`;
+  }
+  function updateMode() {
+    for (const field of countFields) field.hidden = picking();
+    picker.hidden = !picking();
+    intro.textContent = picking()
+      ? "Escolha os exercícios da prova. Todos os alunos recebem estes exercícios, pela ordem da lista (nível, depois título). A prova fecha sozinha quando o tempo acabar."
+      : "Os exercícios são sorteados uma vez e são os mesmos para todos os alunos. A prova fecha sozinha quando o tempo acabar.";
+    updateSummary();
+  }
+
+  let lastPresetTitle = first ? first.title : "";
+  preset.addEventListener("change", () => {
+    const chosen = state.exams.find((e) => e.id === preset.value);
+    if (chosen) {
+      for (const level of LEVELS) counts[level].value = String(chosen.composition[level] || 0);
+      if (!title.value.trim() || title.value === lastPresetTitle) title.value = chosen.title;
+      lastPresetTitle = chosen.title;
+    }
+    updateMode();
+  });
+  for (const level of LEVELS) {
+    counts[level].addEventListener("input", () => {
+      preset.value = "custom";
+      updateSummary();
+    });
+  }
+  duration.addEventListener("input", updateSummary);
+  updateMode();
+
+  return el("form", {
+    class: "card new-session",
+    onsubmit: async (event) => {
+      event.preventDefault();
+      if (picking() && picked.size === 0) {
+        toast("Escolha pelo menos um exercício.", "error");
+        return;
+      }
+      button.disabled = true;
+      const body = { title: title.value.trim(), duration_minutes: Number(duration.value) };
+      if (picking()) body.exercise_ids = pickedIDs();
+      else body.composition = composition();
+      try {
+        const created = await adminApi("/api/admin/sessions", "POST", body);
+        toast(`Prova "${created.title}" aberta até às ${fmtClock(created.ends_at)}.`, "success");
+        await loadAdminData();
+        renderAdminDashboard();
+      } catch (err) {
+        toast(err.message, "error");
+        button.disabled = false;
+      }
+    },
+  },
+  el("h2", {}, "Abrir uma prova"),
+  intro,
+  el("div", { class: "form-grid" },
+    el("label", { class: "field field-wide", for: "new-title" }, el("span", {}, "Título"), title),
+    el("label", { class: "field", for: "new-preset" }, el("span", {}, "Exercícios"), preset),
+    countFields,
+    el("label", { class: "field", for: "new-duration" }, el("span", {}, "Duração (minutos)"), duration)),
+  picker,
+  el("div", { class: "form-actions" }, summary, button));
+}
+
+// exercisePicker is a searchable checklist of every exercise, grouped by
+// level. It fills the picked set and calls onChange after every change.
+function exercisePicker(picked, onChange) {
+  const search = el("input", { class: "input", type: "search", id: "pick-search", placeholder: "Procurar exercício…", "aria-label": "Procurar exercício" });
+  const count = el("span", { class: "muted-text" });
+  const list = el("div", { class: "pick-list" });
+  const clear = el("button", { type: "button", class: "btn btn-ghost btn-sm" }, "Limpar");
+
+  function render() {
+    const q = search.value.trim().toLowerCase();
+    count.textContent = `${plural(picked.size, "escolhido", "escolhidos")}`;
+    list.replaceChildren(...LEVELS.flatMap((level) => {
+      const items = state.exercises.filter((e) => e.difficulty === level &&
+        (!q || e.title.toLowerCase().includes(q) || e.id.includes(q)));
+      if (!items.length) return [];
+      return [
+        el("div", { class: "group-label" }, `${LEVEL_LABELS[level]} · ${plural(LEVEL_POINTS[level], "ponto", "pontos")}`),
+        ...items.map((e) => {
+          const box = el("input", { type: "checkbox", id: `pick-${e.id}`, value: e.id });
+          box.checked = picked.has(e.id);
+          box.addEventListener("change", () => {
+            if (box.checked) picked.add(e.id);
+            else picked.delete(e.id);
+            count.textContent = `${plural(picked.size, "escolhido", "escolhidos")}`;
+            onChange();
+          });
+          return el("label", { class: "pick-item", for: `pick-${e.id}`, title: `${e.id}: ${e.description}` },
+            box, el("span", { class: `dot ${e.difficulty}` }), el("span", { class: "item-title" }, e.title));
+        }),
+      ];
+    }));
+  }
+  search.addEventListener("input", render);
+  clear.addEventListener("click", () => {
+    picked.clear();
+    render();
+    onChange();
+  });
+  render();
+  return el("div", { class: "picker" },
+    el("div", { class: "picker-bar" }, search, count, clear),
+    list);
+}
+
+function sessionsTable() {
+  const rows = state.admin.sessions.map((s) => {
+    const close = async (event) => {
+      event.stopPropagation();
+      if (!confirm(`Terminar a prova "${s.title}" agora? Os alunos deixam de poder submeter.`)) return;
+      try {
+        await adminApi(`/api/admin/sessions/${encodeURIComponent(s.session_id)}/close`, "POST");
+        toast(`Prova "${s.title}" terminada.`, "success");
+        await loadAdminData();
+        renderAdminDashboard();
+      } catch (err) {
+        toast(err.message, "error");
+      }
+    };
+    const showAttempts = () => {
+      state.admin.tab = "attempts";
+      state.admin.attemptsQuery = s.session_id;
+      renderAdminDashboard();
+    };
+    const { points } = compositionFacts(s.composition);
+    return el("tr", { tabindex: "0", title: "Ver as tentativas desta prova", onclick: showAttempts, onkeydown: (e) => e.key === "Enter" && showAttempts() },
+      el("td", {}, el("strong", {}, s.title)),
+      el("td", {}, compositionPills(s.composition)),
+      el("td", { class: "num" }, `${points}`),
+      el("td", { class: "nowrap" }, fmtDate(s.created_at)),
+      el("td", { class: "nowrap" }, s.open
+        ? el("span", { class: "status-cell" }, el("span", { class: "pill tone-ok" }, "Aberta"), " faltam ", countdown(deadlineOf(s), "0:00"))
+        : el("span", { class: "pill" }, `Terminada às ${fmtClock(s.ends_at)}`)),
+      el("td", { class: "num" }, s.students),
+      el("td", {}, s.open ? el("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: close }, "Terminar agora") : null));
   });
   return el("div", { class: "card table-card" },
     el("div", { class: "table-wrap" }, el("table", { class: "data" },
-      el("thead", {}, el("tr", {}, ["Início", "Aluno", "Prova", "Tentativa", "Exercícios submetidos", "Pontos", "Nota"].map((h) => el("th", {}, h)))),
-      el("tbody", {}, rows.length ? rows : el("tr", {}, el("td", { colspan: "7", class: "empty-cell" }, "Nenhuma tentativa."))))));
+      el("thead", {}, el("tr", {}, ["Prova", "Composição", "Pontos", "Aberta em", "Estado", "Alunos", ""].map((h) => el("th", {}, h)))),
+      el("tbody", {}, rows.length ? rows : el("tr", {}, el("td", { colspan: "7", class: "empty-cell" }, "Ainda não abriu nenhuma prova."))))));
 }
 
 function studentsTable() {
@@ -1085,6 +1373,7 @@ async function init() {
     return;
   }
   window.addEventListener("hashchange", route);
+  setInterval(tickCountdowns, 1000);
   route();
 }
 

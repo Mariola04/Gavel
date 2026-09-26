@@ -48,9 +48,16 @@ For comparison, `got` and `output` are decoded into generic JSON values and
 compared with `reflect.DeepEqual` (numbers are compared as `float64`). A `nil`
 slice or map is considered equal to `[]` or `{}`.
 
-## Exam format
+## Exams
 
-An exam template is a file `data/exams/<id>.json`:
+> Exams are run by the teacher. This replaces the original specification's
+> self-service exams, where each student started their own attempt from a
+> template; `POST /api/exams/{id}/attempts` and `gavel start` no longer exist.
+
+### Presets
+
+A preset is a file `data/exams/<id>.json`. The teacher picks one as a starting
+point when opening an exam:
 
 ```json
 {
@@ -60,17 +67,35 @@ An exam template is a file `data/exams/<id>.json`:
 }
 ```
 
-Included templates: `easy` (2 easy + 1 medium), `medium` (1 easy + 2 medium +
+Included presets: `easy` (2 easy + 1 medium), `medium` (1 easy + 2 medium +
 1 hard) and `hard` (1 medium + 3 hard).
 
-**To add a template:** create the file. At startup, Gavel checks that the
-levels are valid, the counts are positive and there are enough exercises of
-each level; otherwise startup fails.
+**To add a preset:** create the file. At startup, Gavel checks that the levels
+are valid, the counts are positive and there are enough exercises of each
+level; otherwise startup fails.
 
-**Attempts.** Starting an exam draws the exercises (`math/rand/v2`, no
-repeats) and saves the attempt in `data/attempts/<attempt_id>.json` together
-with the seed, which makes the draw reproducible. Submissions may include an
-`attempt_id`; in that case the exercise must belong to the attempt.
+### Exam sessions
+
+1. **The teacher opens an exam** in the Docente area (*Provas* tab) with a
+   title, a duration (1 to 480 minutes) and the exercises, chosen in one of
+   three ways:
+   - a **preset** (`easy`, `medium`, `hard`) — exercises drawn by level;
+   - **Personalizada (sorteio)** — a custom number per level, drawn;
+   - **Escolher exercícios** — the teacher ticks the exact exercises (no draw;
+     they appear in list order: level, then title).
+
+   Draws happen **once** (`math/rand/v2`, no repeats) and the session is saved
+   in `data/sessions/<session_id>.json` (with the seed, for draws), so **every
+   student gets the same exercises**.
+2. **Students join** from the *Prova* tab, which lists the open exams with a
+   countdown. Joining creates an attempt (`data/attempts/<attempt_id>.json`)
+   with the student's name. Joining again with the same name (case-insensitive)
+   returns the same attempt, so a student can switch browsers.
+3. **Submissions** carry the `attempt_id`; the exercise must belong to the
+   exam.
+4. **Time is a fixed window** for everyone: when it ends, or when the teacher
+   presses *Terminar agora*, joining and submitting are refused by the server
+   and the web editor locks. Attempts and grades can still be viewed.
 
 **Scoring.** For each exercise, the best submission counts (highest `score`,
 which is the fraction of tests passed — 7 of 10 tests is 0.7). Points earned =

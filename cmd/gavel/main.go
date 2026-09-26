@@ -17,8 +17,9 @@ import (
 const usage = `Utilização:
   gavel exercises [-difficulty easy|medium|hard]   lista os exercícios
   gavel show <id>                                  mostra um exercício
-  gavel exams                                      lista os modelos de prova
-  gavel start [-student <nome>] <exam_id>          inicia uma tentativa de prova
+  gavel exams                                      lista os modelos de prova (usados pelo docente)
+  gavel sessions                                   lista as provas abertas pelo docente
+  gavel join -student <nome> <session_id>          entra numa prova (ou retoma a tentativa)
   gavel submit [-attempt <id>] [-student <nome>] <exercise_id> <ficheiro.go>
                                                    submete uma solução
   gavel attempt <attempt_id>                       mostra a pontuação de uma tentativa
@@ -48,7 +49,8 @@ var commands = map[string]command{
 	"exercises": cmdExercises,
 	"show":      cmdShow,
 	"exams":     cmdExams,
-	"start":     cmdStart,
+	"sessions":  cmdSessions,
+	"join":      cmdJoin,
 	"submit":    cmdSubmit,
 	"attempt":   cmdAttempt,
 	"report":    cmdReport,

@@ -23,7 +23,8 @@ type Client interface {
 	Exercises(ctx context.Context, d exercise.Difficulty) ([]ExerciseSummary, error)
 	Exercise(ctx context.Context, id string) (*ExerciseDetail, error)
 	Exams(ctx context.Context) ([]*exam.Exam, error)
-	StartAttempt(ctx context.Context, examID, student string) (*AttemptView, error)
+	Sessions(ctx context.Context) ([]SessionView, error)
+	JoinSession(ctx context.Context, sessionID, student string) (*AttemptView, error)
 	Attempt(ctx context.Context, id string) (*AttemptView, error)
 	Submit(ctx context.Context, req SubmitRequest) (*engine.Report, error)
 	Report(ctx context.Context, id string) (*engine.Report, error)
@@ -54,11 +55,41 @@ type ExerciseDetail struct {
 	Tests     []PublicTest `json:"tests"`
 }
 
-// AttemptView is an attempt together with its current score.
+// AttemptView is an attempt together with its session's timing and its
+// current score.
 type AttemptView struct {
 	exam.Attempt
-	ExamTitle string     `json:"exam_title"`
-	Score     exam.Score `json:"score"`
+	Title            string     `json:"title"`
+	EndsAt           time.Time  `json:"ends_at"`
+	Open             bool       `json:"open"`
+	RemainingSeconds int64      `json:"remaining_seconds"`
+	Score            exam.Score `json:"score"`
+}
+
+// SessionView is an exam session with its status. Students counts the
+// attempts and is only filled in for the teacher.
+type SessionView struct {
+	exam.Session
+	Open             bool  `json:"open"`
+	RemainingSeconds int64 `json:"remaining_seconds"`
+	Students         int   `json:"students"`
+}
+
+// CreateSessionRequest asks to start an exam session, in one of three ways:
+// ExerciseIDs picks the exact exercises (and wins over the rest);
+// otherwise exercises are drawn from Composition, or from the composition of
+// the Preset (an exam template from data/exams).
+type CreateSessionRequest struct {
+	Title           string                      `json:"title"`
+	Preset          string                      `json:"preset,omitempty"`
+	Composition     map[exercise.Difficulty]int `json:"composition,omitempty"`
+	ExerciseIDs     []string                    `json:"exercise_ids,omitempty"`
+	DurationMinutes int                         `json:"duration_minutes"`
+}
+
+// JoinRequest is the body of a request to join a session.
+type JoinRequest struct {
+	Student string `json:"student"`
 }
 
 // SubmitRequest is a submission. AttemptID and Student are optional; a
@@ -70,14 +101,12 @@ type SubmitRequest struct {
 	Student    string `json:"student,omitempty"`
 }
 
-// StartAttemptRequest is the optional body of a request to start an attempt.
-type StartAttemptRequest struct {
-	Student string `json:"student,omitempty"`
-}
-
-// Admin is the teacher's view: every submission and attempt. It is only
-// exposed by the HTTP server, behind the admin password.
+// Admin is the teacher's side: exam sessions and every submission and
+// attempt. It is only exposed by the HTTP server, behind the admin password.
 type Admin interface {
+	AllSessions(ctx context.Context) ([]SessionView, error)
+	CreateSession(ctx context.Context, req CreateSessionRequest) (*SessionView, error)
+	CloseSession(ctx context.Context, id string) (*SessionView, error)
 	Submissions(ctx context.Context) ([]SubmissionSummary, error)
 	Attempts(ctx context.Context) ([]*AttemptView, error)
 }

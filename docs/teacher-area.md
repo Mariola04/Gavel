@@ -13,7 +13,7 @@ The web interface asks for a name or student number before
 practising. It is stored with every submission (`student`) and attempt; a
 submission inside an exam always takes the attempt's student. There is no
 password, so names are self-declared. In the CLI, use `-student <name>` with
-`start` and `submit`. Names are trimmed, limited to 80 characters and may not
+`join` and `submit`. Names are trimmed, limited to 80 characters and may not
 contain control characters.
 
 ## Teacher area ("Docente" tab)
@@ -28,11 +28,17 @@ GAVEL_ADMIN_PASSWORD='choose-a-password' ./bin/gavel serve
 Without `GAVEL_ADMIN_PASSWORD` the area is disabled. After logging in, the
 teacher sees:
 
-- totals (submissions, students, attempts, pass rate);
+- totals (open exams, submissions, students, pass rate);
+- **Provas** — open a new exam (title, duration in minutes, and a preset, a
+  custom number of exercises per level, or the exact exercises ticked from a
+  searchable list) and follow the exams: composition, time left,
+  how many students joined, and a *Terminar agora* button to close one early.
+  Clicking an exam shows its attempts. See [Exam sessions](content.md#exam-sessions);
 - **Submissões** — every submission, newest first, filterable by student,
   exercise, attempt and verdict; clicking one opens the submitted code and the
   full report;
-- **Tentativas** — every exam attempt with its student, points and grade;
+- **Tentativas** — every exam attempt with its student, exam, status, points
+  and grade, filterable by student or exam;
 - **Alunos** — per student: submissions, exercises solved, best exam grade and
   last activity;
 - optional auto-refresh every 15 seconds.

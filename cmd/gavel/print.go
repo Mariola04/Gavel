@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"gavel/internal/client"
 	"gavel/internal/engine"
@@ -46,15 +47,42 @@ func printExams(w io.Writer, exams []*exam.Exam) {
 	tw := newTable(w)
 	fmt.Fprintln(tw, "Id\tTítulo\tComposição\tDescrição")
 	for _, e := range exams {
-		var parts []string
-		for _, d := range exercise.Difficulties {
-			if n := e.Composition[d]; n > 0 {
-				parts = append(parts, fmt.Sprintf("%d × %s", n, d.Label()))
-			}
-		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", e.ID, e.Title, strings.Join(parts, ", "), e.Description)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", e.ID, e.Title, composition(e.Composition), e.Description)
 	}
 	_ = tw.Flush()
+}
+
+func printSessions(w io.Writer, sessions []client.SessionView) {
+	if len(sessions) == 0 {
+		fmt.Fprintln(w, "Não há provas abertas. Aguarde que o docente abra uma.")
+		return
+	}
+	tw := newTable(w)
+	fmt.Fprintln(tw, "Id\tTítulo\tComposição\tEstado")
+	for _, s := range sessions {
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", s.ID, s.Title, composition(s.Composition), sessionState(s.Open, s.EndsAt, s.RemainingSeconds))
+	}
+	_ = tw.Flush()
+	fmt.Fprintln(w, "\nPara entrar: gavel join -student <nome> <session_id>")
+}
+
+// sessionState describes whether a session is open and until when.
+func sessionState(open bool, endsAt time.Time, remaining int64) string {
+	end := endsAt.Local().Format("15:04")
+	if !open {
+		return "terminada às " + end
+	}
+	return fmt.Sprintf("aberta até às %s (faltam %d min)", end, (remaining+59)/60)
+}
+
+func composition(c map[exercise.Difficulty]int) string {
+	var parts []string
+	for _, d := range exercise.Difficulties {
+		if n := c[d]; n > 0 {
+			parts = append(parts, fmt.Sprintf("%d × %s", n, d.Label()))
+		}
+	}
+	return strings.Join(parts, ", ")
 }
 
 func printAttempt(w io.Writer, a *client.AttemptView) {
@@ -62,9 +90,9 @@ func printAttempt(w io.Writer, a *client.AttemptView) {
 	if a.Student != "" {
 		fmt.Fprintf(w, "Aluno:     %s\n", a.Student)
 	}
-	fmt.Fprintf(w, "Prova:     %s (%s)\n", a.ExamTitle, a.ExamID)
+	fmt.Fprintf(w, "Prova:     %s (%s)\n", a.Title, a.SessionID)
 	fmt.Fprintf(w, "Início:    %s\n", a.StartedAt.Local().Format("2006-01-02 15:04:05"))
-	fmt.Fprintf(w, "Seed:      %d\n\n", a.Seed)
+	fmt.Fprintf(w, "Estado:    %s\n\n", sessionState(a.Open, a.EndsAt, a.RemainingSeconds))
 	tw := newTable(w)
 	fmt.Fprintln(tw, "Exercício\tNível\tTítulo\tSubmissões\tMelhor score\tPontos")
 	for _, e := range a.Score.Exercises {

@@ -11,7 +11,9 @@ arguments of each test and compares the returned value with the expected one.
 - **Dynamic analysis** runs the compiled code against every test in an
   isolated process with time limits, and records results, panics and timeouts.
 - **Partial credit:** the score is the fraction of tests passed.
-- **Exams** draw exercises by level and grade the best submission per exercise.
+- **Exams run by the teacher:** they pick a difficulty, a custom mix or the
+  exact exercises, and the duration; students join from the *Prova* tab and all get the same
+  exercises. The best submission per exercise counts.
 - **Three interfaces** over the same logic: a web app (practice, exams and a
   teacher area), a CLI and an HTTP API.
 

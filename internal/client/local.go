@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"gavel/internal/engine"
@@ -20,6 +20,9 @@ type LocalClient struct {
 	exams     *exam.Catalog
 	engine    *engine.Engine
 	store     *store.Store
+	// sessionMu serialises joins and closes, so a student cannot get two
+	// attempts for the same session by joining twice at once.
+	sessionMu sync.Mutex
 }
 
 var (
@@ -88,39 +91,9 @@ func (c *LocalClient) Exercise(_ context.Context, id string) (*ExerciseDetail, e
 	}, nil
 }
 
-// Exams lists the exam templates.
+// Exams lists the exam presets.
 func (c *LocalClient) Exams(context.Context) ([]*exam.Exam, error) {
 	return c.exams.List(), nil
-}
-
-// StartAttempt draws the exercises for a new attempt and saves it.
-func (c *LocalClient) StartAttempt(_ context.Context, examID, student string) (*AttemptView, error) {
-	e, ok := c.exams.Get(examID)
-	if !ok {
-		return nil, errorf(ErrNotFound, "prova %q não encontrada", examID)
-	}
-	student, err := normalizeStudent(student)
-	if err != nil {
-		return nil, err
-	}
-	now := time.Now().UTC()
-	id, err := store.NewID(now)
-	if err != nil {
-		return nil, err
-	}
-	seed := rand.Uint64() //nolint:gosec // the draw does not need a cryptographic generator
-	a := &exam.Attempt{
-		ID:          id,
-		ExamID:      e.ID,
-		Student:     student,
-		StartedAt:   now,
-		Seed:        seed,
-		ExerciseIDs: e.Draw(c.exercises, seed),
-	}
-	if err := c.store.SaveAttempt(a); err != nil {
-		return nil, fmt.Errorf("guardar tentativa: %w", err)
-	}
-	return c.view(a, nil), nil
 }
 
 // Attempt returns an attempt with its current score.
@@ -129,11 +102,7 @@ func (c *LocalClient) Attempt(_ context.Context, id string) (*AttemptView, error
 	if err != nil {
 		return nil, err
 	}
-	reports, err := c.store.ReportsByAttempt(a.ID)
-	if err != nil {
-		return nil, fmt.Errorf("ler submissões da tentativa: %w", err)
-	}
-	return c.view(a, reports), nil
+	return c.attemptView(a)
 }
 
 // Submit evaluates a submission and saves its report.
@@ -156,6 +125,13 @@ func (c *LocalClient) Submit(ctx context.Context, req SubmitRequest) (*engine.Re
 		}
 		if !a.Contains(ex.ID) {
 			return nil, errorf(ErrInvalid, "o exercício %q não pertence à tentativa %s", ex.ID, a.ID)
+		}
+		sess, err := c.session(a.SessionID)
+		if err != nil {
+			return nil, err
+		}
+		if !sess.Open(time.Now()) {
+			return nil, errorf(ErrInvalid, "a prova %q já terminou: não são aceites mais submissões", sess.Title)
 		}
 		if a.Student != "" {
 			student = a.Student
@@ -234,28 +210,54 @@ func (c *LocalClient) Attempts(context.Context) ([]*AttemptView, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ler relatórios: %w", err)
 	}
+	sessions, err := c.store.Sessions()
+	if err != nil {
+		return nil, fmt.Errorf("ler provas: %w", err)
+	}
+	byID := make(map[string]*exam.Session, len(sessions))
+	for _, s := range sessions {
+		byID[s.ID] = s
+	}
 	byAttempt := make(map[string][]*engine.Report)
 	for _, r := range reports {
 		if r.AttemptID != "" {
 			byAttempt[r.AttemptID] = append(byAttempt[r.AttemptID], r)
 		}
 	}
+	now := time.Now()
 	out := make([]*AttemptView, len(attempts))
 	for i, a := range attempts {
-		out[i] = c.view(a, byAttempt[a.ID])
+		out[i] = c.view(a, byID[a.SessionID], byAttempt[a.ID], now)
 	}
 	return out, nil
 }
 
-// view scores an attempt from its reports.
-func (c *LocalClient) view(a *exam.Attempt, reports []*engine.Report) *AttemptView {
+// attemptView loads an attempt's session and reports and scores it.
+func (c *LocalClient) attemptView(a *exam.Attempt) (*AttemptView, error) {
+	sess, err := c.session(a.SessionID)
+	if err != nil {
+		return nil, err
+	}
+	reports, err := c.store.ReportsByAttempt(a.ID)
+	if err != nil {
+		return nil, fmt.Errorf("ler submissões da tentativa: %w", err)
+	}
+	return c.view(a, sess, reports, time.Now()), nil
+}
+
+// view scores an attempt from its reports. sess may be nil if the session
+// file is missing.
+func (c *LocalClient) view(a *exam.Attempt, sess *exam.Session, reports []*engine.Report, now time.Time) *AttemptView {
 	subs := make([]exam.Submission, len(reports))
 	for i, r := range reports {
 		subs[i] = exam.Submission{ExerciseID: r.ExerciseID, Score: r.Summary.Score}
 	}
 	v := &AttemptView{Attempt: *a, Score: exam.ComputeScore(a, c.exercises, subs)}
-	if e, ok := c.exams.Get(a.ExamID); ok {
-		v.ExamTitle = e.Title
+	if sess != nil {
+		v.Title = sess.Title
+		v.EndsAt = sess.EndsAt
+		v.Open = sess.Open(now)
+		v.RemainingSeconds = remaining(sess, now)
 	}
 	return v
 }
