@@ -19,9 +19,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # golangci-lint v1.64.8 is built with Go 1.24 and cannot read the
+      # standard library compiled by newer Go releases ("export data version
+      # ... is greater than maximum supported version"), so linting is pinned
+      # to Go 1.24. The tests still run on the latest stable release.
       - uses: actions/setup-go@v5
         with:
-          go-version: stable
+          go-version: "1.24"
 
       - name: Check formatting
         run: make fmt-check

@@ -108,7 +108,7 @@ Everything Gavel can do, in one page. Details in [README.md](README.md).
 | Malicious/edge submissions | `go test ./internal/engine -run TestEvaluateSubmissions` |
 | HTTP routes | `go test ./internal/server` |
 
-- **CI** (`.github/workflows/qualify.yaml`): on every push and PR → fmt-check + vet + golangci-lint, and `make test` + `make build` on **Go 1.22** and **latest stable** (gosec only on stable). See the Actions tab / PR checks.
+- **CI** (`.github/workflows/qualify.yaml`): on every push and PR → fmt-check + vet + golangci-lint (on Go 1.24, the newest the pinned linter supports), and `make test` + `make build` on **Go 1.22** and **latest stable** (gosec only on stable). See the Actions tab / PR checks.
 - Same checks locally before pushing: `make check`.
 - Test submissions live in `testdata/submissions/` (correct, wrong, syntax/type error, `os`/`net/http` imports, infinite loop, panic, unformatted, `Println`, forged output, vet error).
 

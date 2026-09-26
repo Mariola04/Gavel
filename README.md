@@ -107,10 +107,15 @@ every push (any branch) and every pull request, with two jobs:
 
 | Job | What it runs |
 |-----|--------------|
-| **Format, vet and lint** | `make fmt-check`, `make vet`, golangci-lint v1.64.8 with `.golangci.yml` |
+| **Format, vet and lint** (Go 1.24) | `make fmt-check`, `make vet`, golangci-lint v1.64.8 with `.golangci.yml` |
 | **Tests** (Go 1.22 and latest stable) | `make test` (`go test -race ./...`, including the full evaluation pipeline and every reference solution) and `make build` |
 
 - Go 1.22 is the minimum supported version, so it is tested explicitly.
+- The lint job is pinned to Go 1.24 because the golangci-lint v1.64.8 binary
+  is built with Go 1.24 and cannot type-check code against newer Go releases
+  (it fails with "export data version … is greater than maximum supported
+  version"). Moving to a newer Go for linting requires golangci-lint v2 and
+  migrating `.golangci.yml` to the v2 format.
 - `gosec` is installed only in the stable job, so the security stage runs for
   real there, and the "gosec not installed → skipped" path is covered by the
   Go 1.22 job.
