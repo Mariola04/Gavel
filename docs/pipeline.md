@@ -4,6 +4,8 @@
 
 What happens to a submission: the static analysis (stages 1–8), the dynamic analysis (stage 9) and how results are compared.
 
+![Gavel evaluation flow](Gavel-Flow.excalidraw.png)
+
 ## Stages
 
 Stages run in this order. A blocking stage that fails ends the evaluation, and

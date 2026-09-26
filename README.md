@@ -17,6 +17,14 @@ arguments of each test and compares the returned value with the expected one.
 
 The user-facing text (web, CLI, reports) is in European Portuguese.
 
+## How it works
+
+![Gavel evaluation flow: pre-checks, static analysis (limits, parse, ast, gofmt and complexity, go vet and gosec, go build), dynamic analysis (run tests in the sandbox), then the report. Any blocking failure stops the pipeline and goes straight to the report.](docs/Gavel-Flow.excalidraw.png)
+
+Stages run cheapest first and stop at the first blocking failure; every
+outcome produces a saved report. Details in
+[docs/pipeline.md](docs/pipeline.md).
+
 ## Quick start
 
 You need **Go 1.22 or later**, `git` and `make` (Linux or macOS).
