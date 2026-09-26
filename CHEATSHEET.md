@@ -1,6 +1,6 @@
 # Gavel cheat sheet
 
-Everything Gavel can do, in one page. Details in [README.md](README.md).
+Everything Gavel can do, in one page. Details in the [README](README.md) and the topic guides in [`docs/`](docs/).
 
 ## Setup
 - Needs **Go 1.22+**. Optional: `gosec` (security stage), `firejail` (isolation), `golangci-lint` (dev).
