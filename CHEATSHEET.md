@@ -30,17 +30,18 @@ Everything Gavel can do, in one page. Details in the [README](README.md) and the
 ## CLI
 | Do | Command |
 |----|---------|
-| List exercises | `gavel exercises [-difficulty easy\|medium\|hard]` |
-| Show one (signature, test inputs, skeleton) | `gavel show <id>` |
-| List exams | `gavel exams` |
-| Start an exam | `gavel start [-student <name>] <exam_id>` → prints `attempt_id` |
-| Submit (practice) | `gavel submit [-student <name>] <exercise_id> file.go` |
-| Submit (exam) | `gavel submit -attempt <attempt_id> <exercise_id> file.go` |
-| Attempt score | `gavel attempt <attempt_id>` |
-| Saved report | `gavel report <submission_id>` |
-| Server | `gavel serve [-addr ...] [-sandbox ...]` |
-| Help | `gavel help` |
+| List exercises | `./bin/gavel exercises [-difficulty easy\|medium\|hard]` |
+| Show one (signature, test inputs, skeleton) | `./bin/gavel show <id>` |
+| List exams | `./bin/gavel exams` |
+| Start an exam | `./bin/gavel start [-student <name>] <exam_id>` → prints `attempt_id` |
+| Submit (practice) | `./bin/gavel submit [-student <name>] <exercise_id> file.go` |
+| Submit (exam) | `./bin/gavel submit -attempt <attempt_id> <exercise_id> file.go` |
+| Attempt score | `./bin/gavel attempt <attempt_id>` |
+| Saved report | `./bin/gavel report <submission_id>` |
+| Server | `./bin/gavel serve [-addr ...] [-sandbox ...]` |
+| Help | `./bin/gavel help` |
 
+- `./bin/gavel` is the binary from `make build`; run it from the repo root. For a plain `gavel` command: `go install ./cmd/gavel` and put `$(go env GOPATH)/bin` on your `PATH`.
 - Flags go **before** arguments.
 - `submit` exit code: `0` = passed, `1` = anything else (handy in scripts/CI); `2` = bad usage.
 - **Remote mode**: `export SERVER=http://localhost:8080` → same commands hit the server.

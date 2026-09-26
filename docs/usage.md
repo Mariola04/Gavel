@@ -19,18 +19,30 @@ data directory, set `GAVEL_DATA`.
 
 ## CLI
 
-```
-gavel exercises [-difficulty easy]          # table: Id | Level | Title | Description
-gavel show <id>                             # exercise details
-gavel exams                                 # list exam templates
-gavel start [-student <name>] <exam_id>     # start an attempt, show attempt_id and exercises
-gavel submit [-attempt <id>] [-student <name>] <exercise_id> <file.go>
-gavel attempt <attempt_id>                  # attempt score
-gavel report <submission_id>                # saved report
-gavel serve [-addr localhost:8080] [-sandbox auto|firejail|none]
+`make build` creates the binary at `./bin/gavel`, which is what the examples
+below use. Run them from the repository root, because Gavel reads `./data`
+(or set `GAVEL_DATA=/path/to/Gavel/data`).
+
+To type just `gavel` instead, install it into your Go bin folder and make sure
+that folder is on your `PATH`:
+
+```sh
+go install ./cmd/gavel                     # installs to $(go env GOPATH)/bin/gavel
+export PATH="$PATH:$(go env GOPATH)/bin"   # add this line to ~/.bashrc to keep it
 ```
 
-Flags come before arguments (`gavel submit -attempt X factorial sol.go`).
+```
+./bin/gavel exercises [-difficulty easy]          # table: Id | Level | Title | Description
+./bin/gavel show <id>                             # exercise details
+./bin/gavel exams                                 # list exam templates
+./bin/gavel start [-student <name>] <exam_id>     # start an attempt, show attempt_id and exercises
+./bin/gavel submit [-attempt <id>] [-student <name>] <exercise_id> <file.go>
+./bin/gavel attempt <attempt_id>                  # attempt score
+./bin/gavel report <submission_id>                # saved report
+./bin/gavel serve [-addr localhost:8080] [-sandbox auto|firejail|none]
+```
+
+Flags come before arguments (`./bin/gavel submit -attempt X factorial sol.go`).
 `submit` exits with code 0 if the verdict is `passed` and 1 otherwise.
 
 By default the CLI works directly on the local disk. If the `SERVER`
@@ -38,15 +50,15 @@ environment variable is set, the same commands use the remote API:
 
 ```sh
 export SERVER=http://localhost:8080
-gavel exercises -difficulty hard
+./bin/gavel exercises -difficulty hard
 ```
 
 An exam example:
 
 ```sh
-gavel start easy                          # shows the attempt_id and the drawn exercises
-gavel submit -attempt <attempt_id> leap leap.go
-gavel attempt <attempt_id>                # current score
+./bin/gavel start easy                          # shows the attempt_id and the drawn exercises
+./bin/gavel submit -attempt <attempt_id> leap leap.go
+./bin/gavel attempt <attempt_id>                # current score
 ```
 
 ## Using Gavel from other devices

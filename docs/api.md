@@ -2,7 +2,7 @@
 
 [← Back to the README](../README.md)
 
-The JSON API served by `gavel serve`, including the teacher routes.
+The JSON API served by `./bin/gavel serve`, including the teacher routes.
 
 ## Public routes
 
