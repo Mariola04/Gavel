@@ -1,6 +1,6 @@
 # Gavel automatic grader for Go functions
 
-[![qualify](https://github.com/Mariola04/Gavel/actions/workflows/qualify.yaml/badge.svg)](https://github.com/Mariola04/Gavel/actions/workflows/qualify.yaml)
+[![qualify](https://github.com/Mariola04/Gavel/actions/workflows/qualify.yaml/badge.svg?branch=main)](https://github.com/Mariola04/Gavel/actions/workflows/qualify.yaml)
 
 An academic prototype of an automatic grader for Go submissions. Each exercise
 asks for **one function**: Gavel calls the student's function with the
