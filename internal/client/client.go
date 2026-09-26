@@ -8,6 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"gavel/internal/engine"
 	"gavel/internal/exam"
@@ -19,7 +23,7 @@ type Client interface {
 	Exercises(ctx context.Context, d exercise.Difficulty) ([]ExerciseSummary, error)
 	Exercise(ctx context.Context, id string) (*ExerciseDetail, error)
 	Exams(ctx context.Context) ([]*exam.Exam, error)
-	StartAttempt(ctx context.Context, examID string) (*AttemptView, error)
+	StartAttempt(ctx context.Context, examID, student string) (*AttemptView, error)
 	Attempt(ctx context.Context, id string) (*AttemptView, error)
 	Submit(ctx context.Context, req SubmitRequest) (*engine.Report, error)
 	Report(ctx context.Context, id string) (*engine.Report, error)
@@ -57,11 +61,55 @@ type AttemptView struct {
 	Score     exam.Score `json:"score"`
 }
 
-// SubmitRequest is a submission. AttemptID is optional.
+// SubmitRequest is a submission. AttemptID and Student are optional; a
+// submission to an attempt takes the attempt's student.
 type SubmitRequest struct {
 	ExerciseID string `json:"exercise_id"`
 	Code       string `json:"code"`
 	AttemptID  string `json:"attempt_id,omitempty"`
+	Student    string `json:"student,omitempty"`
+}
+
+// StartAttemptRequest is the optional body of a request to start an attempt.
+type StartAttemptRequest struct {
+	Student string `json:"student,omitempty"`
+}
+
+// Admin is the teacher's view: every submission and attempt. It is only
+// exposed by the HTTP server, behind the admin password.
+type Admin interface {
+	Submissions(ctx context.Context) ([]SubmissionSummary, error)
+	Attempts(ctx context.Context) ([]*AttemptView, error)
+}
+
+// SubmissionSummary is a report without the code and test details.
+type SubmissionSummary struct {
+	SubmissionID string         `json:"submission_id"`
+	Student      string         `json:"student,omitempty"`
+	ExerciseID   string         `json:"exercise_id"`
+	AttemptID    string         `json:"attempt_id,omitempty"`
+	SubmittedAt  time.Time      `json:"submitted_at"`
+	Verdict      engine.Verdict `json:"verdict"`
+	Passed       int            `json:"passed"`
+	Total        int            `json:"total"`
+	Score        float64        `json:"score"`
+	StoppedAt    string         `json:"stopped_at,omitempty"`
+}
+
+// maxStudentName caps the length of a student name, in runes.
+const maxStudentName = 80
+
+// normalizeStudent trims a student name and rejects names that are too long
+// or contain control characters. Names are self-declared, not authenticated.
+func normalizeStudent(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if utf8.RuneCountInString(name) > maxStudentName {
+		return "", errorf(ErrInvalid, "o nome do aluno tem mais de %d caracteres", maxStudentName)
+	}
+	if strings.IndexFunc(name, unicode.IsControl) >= 0 {
+		return "", errorf(ErrInvalid, "o nome do aluno contém caracteres inválidos")
+	}
+	return name, nil
 }
 
 // Error kinds, to be matched with errors.Is.

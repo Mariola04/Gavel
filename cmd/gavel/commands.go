@@ -93,7 +93,9 @@ func cmdExams(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 }
 
 func cmdStart(ctx context.Context, args []string, stdout, stderr io.Writer) error {
-	pos, err := parseArgs(newFlags("start", stderr), args, "<exam_id>")
+	fs := newFlags("start", stderr)
+	student := fs.String("student", "", "nome do aluno (opcional)")
+	pos, err := parseArgs(fs, args, "<exam_id>")
 	if err != nil {
 		return err
 	}
@@ -101,7 +103,7 @@ func cmdStart(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 	if err != nil {
 		return err
 	}
-	a, err := c.StartAttempt(ctx, pos[0])
+	a, err := c.StartAttempt(ctx, pos[0], *student)
 	if err != nil {
 		return err
 	}
@@ -113,6 +115,7 @@ func cmdStart(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 func cmdSubmit(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	fs := newFlags("submit", stderr)
 	attemptID := fs.String("attempt", "", "id da tentativa de prova (opcional)")
+	student := fs.String("student", "", "nome do aluno (opcional; numa prova usa o da tentativa)")
 	pos, err := parseArgs(fs, args, "<exercise_id>", "<ficheiro.go>")
 	if err != nil {
 		return err
@@ -125,7 +128,9 @@ func cmdSubmit(ctx context.Context, args []string, stdout, stderr io.Writer) err
 	if err != nil {
 		return err
 	}
-	r, err := c.Submit(ctx, client.SubmitRequest{ExerciseID: pos[0], Code: code, AttemptID: *attemptID})
+	r, err := c.Submit(ctx, client.SubmitRequest{
+		ExerciseID: pos[0], Code: code, AttemptID: *attemptID, Student: *student,
+	})
 	if err != nil {
 		return err
 	}
@@ -202,9 +207,13 @@ func cmdServe(ctx context.Context, args []string, _, stderr io.Writer) error {
 	}
 
 	logger := slog.New(slog.NewTextHandler(stderr, nil))
+	// The admin password comes from the environment, never from the code.
+	adminPassword := os.Getenv("GAVEL_ADMIN_PASSWORD")
 	srv := &http.Server{
-		Addr:              *addr,
-		Handler:           server.New(c, web.FS, logger),
+		Addr: *addr,
+		Handler: server.New(server.Config{
+			Client: c, Admin: c, AdminPassword: adminPassword, Web: web.FS, Logger: logger,
+		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		// Submissions are evaluated synchronously, so responses may be slow.
@@ -215,7 +224,10 @@ func cmdServe(ctx context.Context, args []string, _, stderr io.Writer) error {
 	}
 	errc := make(chan error, 1)
 	go func() { errc <- srv.ListenAndServe() }()
-	logger.Info("servidor a correr", "url", "http://"+*addr, "sandbox", mode)
+	logger.Info("servidor a correr", "url", "http://"+*addr, "sandbox", mode, "docente", adminPassword != "")
+	if adminPassword == "" {
+		logger.Warn("área de docente desativada: defina GAVEL_ADMIN_PASSWORD para a ativar")
+	}
 
 	select {
 	case err := <-errc:

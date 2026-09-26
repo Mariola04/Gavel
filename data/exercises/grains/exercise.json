@@ -4,6 +4,7 @@
   "difficulty": "easy",
   "function": "Square",
   "params": ["int"],
+  "param_names": ["n"],
   "returns": "uint64",
   "timeout_ms": 1000,
   "tests": [

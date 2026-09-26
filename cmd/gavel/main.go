@@ -18,8 +18,8 @@ const usage = `Utilização:
   gavel exercises [-difficulty easy|medium|hard]   lista os exercícios
   gavel show <id>                                  mostra um exercício
   gavel exams                                      lista os modelos de prova
-  gavel start <exam_id>                            inicia uma tentativa de prova
-  gavel submit [-attempt <id>] <exercise_id> <ficheiro.go>
+  gavel start [-student <nome>] <exam_id>          inicia uma tentativa de prova
+  gavel submit [-attempt <id>] [-student <nome>] <exercise_id> <ficheiro.go>
                                                    submete uma solução
   gavel attempt <attempt_id>                       mostra a pontuação de uma tentativa
   gavel report <submission_id>                     mostra um relatório guardado
@@ -30,6 +30,8 @@ Variáveis de ambiente:
   SERVER      URL de um servidor Gavel (ex.: http://localhost:8080); se
               definida, os comandos usam o servidor em vez do disco local
   GAVEL_DATA  diretoria de dados (por omissão: data)
+  GAVEL_ADMIN_PASSWORD
+              palavra-passe da área de docente (serve); sem ela, fica desativada
 `
 
 // errUsage marks errors caused by invalid command-line usage.

@@ -2,11 +2,15 @@
 package server
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"gavel/internal/client"
@@ -19,9 +23,26 @@ import (
 // fits is rejected by the engine's limits stage.
 const maxBodyBytes = 4 * engine.MaxCodeSize
 
-// New returns the HTTP handler for the API and the static files in web.
-func New(c client.Client, web fs.FS, logger *slog.Logger) http.Handler {
-	h := &handler{client: c, logger: logger}
+// Config configures the HTTP handler.
+type Config struct {
+	Client client.Client
+	// Admin serves the teacher's routes under /api/admin/.
+	Admin client.Admin
+	// AdminPassword protects /api/admin/. When empty, those routes are
+	// disabled.
+	AdminPassword string
+	// Web holds the static files of the web interface.
+	Web    fs.FS
+	Logger *slog.Logger
+}
+
+// New returns the HTTP handler for the API and the web interface.
+func New(cfg Config) http.Handler {
+	h := &handler{client: cfg.Client, admin: cfg.Admin, logger: cfg.Logger}
+	if cfg.AdminPassword != "" {
+		sum := sha256.Sum256([]byte(cfg.AdminPassword))
+		h.adminHash = sum[:]
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/exercises", h.listExercises)
 	mux.HandleFunc("GET /api/exercises/{id}", h.getExercise)
@@ -30,16 +51,22 @@ func New(c client.Client, web fs.FS, logger *slog.Logger) http.Handler {
 	mux.HandleFunc("GET /api/attempts/{id}", h.getAttempt)
 	mux.HandleFunc("POST /api/submissions", h.submit)
 	mux.HandleFunc("GET /api/submissions/{id}", h.getReport)
+	mux.HandleFunc("GET /api/admin/submissions", h.requireAdmin(h.adminSubmissions))
+	mux.HandleFunc("GET /api/admin/attempts", h.requireAdmin(h.adminAttempts))
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "rota não encontrada")
 	})
-	mux.Handle("/", http.FileServerFS(web))
-	return logRequests(logger, cors(mux))
+	mux.Handle("/", http.FileServerFS(cfg.Web))
+	return logRequests(cfg.Logger, cors(mux))
 }
 
 type handler struct {
 	client client.Client
-	logger *slog.Logger
+	admin  client.Admin
+	// adminHash is the SHA-256 of the admin password, or nil when the
+	// admin routes are disabled.
+	adminHash []byte
+	logger    *slog.Logger
 }
 
 func (h *handler) listExercises(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +90,12 @@ func (h *handler) listExams(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) startAttempt(w http.ResponseWriter, r *http.Request) {
-	a, err := h.client.StartAttempt(r.Context(), r.PathValue("id"))
+	// The body is optional: {"student": "..."}.
+	var req client.StartAttemptRequest
+	if !decodeJSON(w, r, &req, true) {
+		return
+	}
+	a, err := h.client.StartAttempt(r.Context(), r.PathValue("id"), req.Student)
 	h.respond(w, http.StatusCreated, a, err)
 }
 
@@ -74,15 +106,7 @@ func (h *handler) getAttempt(w http.ResponseWriter, r *http.Request) {
 
 func (h *handler) submit(w http.ResponseWriter, r *http.Request) {
 	var req client.SubmitRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		var tooLarge *http.MaxBytesError
-		if errors.As(err, &tooLarge) {
-			writeError(w, http.StatusRequestEntityTooLarge, "pedido demasiado grande")
-			return
-		}
-		writeError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
+	if !decodeJSON(w, r, &req, false) {
 		return
 	}
 	report, err := h.client.Submit(r.Context(), req)
@@ -92,6 +116,54 @@ func (h *handler) submit(w http.ResponseWriter, r *http.Request) {
 func (h *handler) getReport(w http.ResponseWriter, r *http.Request) {
 	report, err := h.client.Report(r.Context(), r.PathValue("id"))
 	h.respond(w, http.StatusOK, report, err)
+}
+
+func (h *handler) adminSubmissions(w http.ResponseWriter, r *http.Request) {
+	list, err := h.admin.Submissions(r.Context())
+	h.respond(w, http.StatusOK, list, err)
+}
+
+func (h *handler) adminAttempts(w http.ResponseWriter, r *http.Request) {
+	list, err := h.admin.Attempts(r.Context())
+	h.respond(w, http.StatusOK, list, err)
+}
+
+// requireAdmin only lets through requests with the header
+// "Authorization: Bearer <admin password>".
+func (h *handler) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.adminHash == nil || h.admin == nil {
+			writeError(w, http.StatusNotFound, "área de docente desativada: defina GAVEL_ADMIN_PASSWORD ao arrancar o servidor")
+			return
+		}
+		password, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		// Comparing fixed-size hashes in constant time does not leak the
+		// password length or content through timing.
+		sum := sha256.Sum256([]byte(password))
+		if !ok || subtle.ConstantTimeCompare(sum[:], h.adminHash) != 1 {
+			writeError(w, http.StatusUnauthorized, "palavra-passe de docente inválida")
+			return
+		}
+		next(w, r)
+	}
+}
+
+// decodeJSON reads a size-limited JSON body into v and writes the error
+// response when it fails. With optional set, an empty body is accepted.
+func decodeJSON(w http.ResponseWriter, r *http.Request, v any, optional bool) bool {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+	dec.DisallowUnknownFields()
+	err := dec.Decode(v)
+	var tooLarge *http.MaxBytesError
+	switch {
+	case err == nil, optional && errors.Is(err, io.EOF):
+		return true
+	case errors.As(err, &tooLarge):
+		writeError(w, http.StatusRequestEntityTooLarge, "pedido demasiado grande")
+	default:
+		writeError(w, http.StatusBadRequest, "JSON inválido: "+err.Error())
+	}
+	return false
 }
 
 // respond writes v with the given status, or the error with the status
@@ -127,7 +199,7 @@ func cors(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		if r.Method == http.MethodOptions {
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}

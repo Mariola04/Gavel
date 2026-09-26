@@ -69,9 +69,11 @@ type Exercise struct {
 	Difficulty  Difficulty `json:"difficulty"`
 	Function    string     `json:"function"`
 	Params      []string   `json:"params"`
-	Returns     string     `json:"returns"`
-	TimeoutMS   int        `json:"timeout_ms"`
-	Tests       []Test     `json:"tests"`
+	// ParamNames is optional and only used to display the signature.
+	ParamNames []string `json:"param_names,omitempty"`
+	Returns    string   `json:"returns"`
+	TimeoutMS  int      `json:"timeout_ms"`
+	Tests      []Test   `json:"tests"`
 }
 
 var idPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
@@ -91,6 +93,18 @@ func (e *Exercise) Validate() error {
 	if !e.Difficulty.Valid() {
 		errs = append(errs, fmt.Errorf("difficulty inválida %q", e.Difficulty))
 	}
+	if e.TimeoutMS <= 0 {
+		errs = append(errs, errors.New("timeout_ms tem de ser positivo"))
+	}
+	errs = append(errs, e.validateSignature()...)
+	errs = append(errs, e.validateTests()...)
+	return errors.Join(errs...)
+}
+
+// validateSignature checks the function name, parameter and return types,
+// and the optional parameter names.
+func (e *Exercise) validateSignature() []error {
+	var errs []error
 	if !token.IsIdentifier(e.Function) || !token.IsExported(e.Function) {
 		errs = append(errs, fmt.Errorf("function %q tem de ser um identificador exportado", e.Function))
 	}
@@ -99,15 +113,27 @@ func (e *Exercise) Validate() error {
 			errs = append(errs, fmt.Errorf("params[%d]: %w", i, err))
 		}
 	}
+	if e.ParamNames != nil && len(e.ParamNames) != len(e.Params) {
+		errs = append(errs, fmt.Errorf("param_names tem %d nomes, esperados %d", len(e.ParamNames), len(e.Params)))
+	}
+	for _, name := range e.ParamNames {
+		if !token.IsIdentifier(name) {
+			errs = append(errs, fmt.Errorf("param_names: nome inválido %q", name))
+		}
+	}
 	if err := validateType(e.Returns); err != nil {
 		errs = append(errs, fmt.Errorf("returns: %w", err))
 	}
-	if e.TimeoutMS <= 0 {
-		errs = append(errs, errors.New("timeout_ms tem de ser positivo"))
-	}
+	return errs
+}
+
+// validateTests checks that there are tests and that each one matches the
+// signature.
+func (e *Exercise) validateTests() []error {
 	if len(e.Tests) == 0 {
-		errs = append(errs, errors.New("é necessário pelo menos um teste"))
+		return []error{errors.New("é necessário pelo menos um teste")}
 	}
+	var errs []error
 	for i, t := range e.Tests {
 		if len(t.Input) != len(e.Params) {
 			errs = append(errs, fmt.Errorf("tests[%d]: input tem %d valores, esperados %d", i, len(t.Input), len(e.Params)))
@@ -116,7 +142,7 @@ func (e *Exercise) Validate() error {
 			errs = append(errs, fmt.Errorf("tests[%d]: output em falta", i))
 		}
 	}
-	return errors.Join(errs...)
+	return errs
 }
 
 // validateType accepts only JSON-serialisable Go type expressions: named
@@ -147,14 +173,23 @@ func isJSONType(expr ast.Expr) bool {
 	}
 }
 
-// Signature returns the Go declaration the student must write,
-// e.g. "func Sum(a0 []int) int".
+// Signature returns the Go declaration the student must write, grouping
+// consecutive parameters of the same type, e.g. "func Distance(a, b string) int".
+// Parameters are named p0, p1, ... when ParamNames is not set.
 func (e *Exercise) Signature() string {
-	params := make([]string, len(e.Params))
-	for i, p := range e.Params {
-		params[i] = fmt.Sprintf("a%d %s", i, p)
+	var groups []string
+	for i, typ := range e.Params {
+		name := fmt.Sprintf("p%d", i)
+		if e.ParamNames != nil {
+			name = e.ParamNames[i]
+		}
+		if i+1 < len(e.Params) && e.Params[i+1] == typ {
+			groups = append(groups, name)
+			continue
+		}
+		groups = append(groups, name+" "+typ)
 	}
-	return fmt.Sprintf("func %s(%s) %s", e.Function, strings.Join(params, ", "), e.Returns)
+	return fmt.Sprintf("func %s(%s) %s", e.Function, strings.Join(groups, ", "), e.Returns)
 }
 
 // Timeout returns the per-test time limit.

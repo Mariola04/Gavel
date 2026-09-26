@@ -132,6 +132,7 @@ func (c *Catalog) List() []*Exam { return c.sorted }
 type Attempt struct {
 	ID          string    `json:"attempt_id"`
 	ExamID      string    `json:"exam_id"`
+	Student     string    `json:"student,omitempty"`
 	StartedAt   time.Time `json:"started_at"`
 	Seed        uint64    `json:"seed"`
 	ExerciseIDs []string  `json:"exercise_ids"`

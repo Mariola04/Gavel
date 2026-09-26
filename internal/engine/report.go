@@ -87,6 +87,7 @@ type Report struct {
 	SubmissionID string        `json:"submission_id"`
 	ExerciseID   string        `json:"exercise_id"`
 	AttemptID    string        `json:"attempt_id"`
+	Student      string        `json:"student,omitempty"`
 	SubmittedAt  time.Time     `json:"submitted_at"`
 	Code         string        `json:"code"`
 	Static       StaticResult  `json:"static"`

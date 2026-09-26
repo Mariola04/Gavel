@@ -4,6 +4,7 @@
   "difficulty": "medium",
   "function": "Steps",
   "params": ["int"],
+  "param_names": ["n"],
   "returns": "int",
   "timeout_ms": 1000,
   "tests": [

@@ -59,6 +59,9 @@ func printExams(w io.Writer, exams []*exam.Exam) {
 
 func printAttempt(w io.Writer, a *client.AttemptView) {
 	fmt.Fprintf(w, "Tentativa: %s\n", a.ID)
+	if a.Student != "" {
+		fmt.Fprintf(w, "Aluno:     %s\n", a.Student)
+	}
 	fmt.Fprintf(w, "Prova:     %s (%s)\n", a.ExamTitle, a.ExamID)
 	fmt.Fprintf(w, "Início:    %s\n", a.StartedAt.Local().Format("2006-01-02 15:04:05"))
 	fmt.Fprintf(w, "Seed:      %d\n\n", a.Seed)
@@ -75,6 +78,9 @@ func printAttempt(w io.Writer, a *client.AttemptView) {
 func printReport(w io.Writer, r *engine.Report) {
 	fmt.Fprintf(w, "Submissão: %s\n", r.SubmissionID)
 	fmt.Fprintf(w, "Exercício: %s\n", r.ExerciseID)
+	if r.Student != "" {
+		fmt.Fprintf(w, "Aluno:     %s\n", r.Student)
+	}
 	if r.AttemptID != "" {
 		fmt.Fprintf(w, "Tentativa: %s\n", r.AttemptID)
 	}
@@ -88,7 +94,7 @@ func printReport(w io.Writer, r *engine.Report) {
 		fmt.Fprintf(w, "Parou em:  %s\n", s.StoppedAt)
 	}
 
-	fmt.Fprintln(w, "\nVerificações:")
+	fmt.Fprintln(w, "\nAnálise estática:")
 	tw := newTable(w)
 	for _, c := range r.Static.Checks {
 		msgs := c.Messages
@@ -103,9 +109,10 @@ func printReport(w io.Writer, r *engine.Report) {
 	_ = tw.Flush()
 
 	if !r.Dynamic.Executed {
+		fmt.Fprintln(w, "\nAnálise dinâmica: não executada (o código não passou a análise estática).")
 		return
 	}
-	fmt.Fprintln(w, "\nTestes:")
+	fmt.Fprintln(w, "\nAnálise dinâmica (testes):")
 	tw = newTable(w)
 	fmt.Fprintln(tw, "  #\tResultado\tEntrada\tEsperado\tObtido\tTempo\tObservações")
 	for i, t := range r.Dynamic.Tests {

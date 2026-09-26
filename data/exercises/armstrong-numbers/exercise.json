@@ -4,6 +4,7 @@
   "difficulty": "medium",
   "function": "IsArmstrongNumber",
   "params": ["int"],
+  "param_names": ["n"],
   "returns": "bool",
   "timeout_ms": 1000,
   "tests": [

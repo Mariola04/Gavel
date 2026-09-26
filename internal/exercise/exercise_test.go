@@ -43,6 +43,8 @@ func TestValidate(t *testing.T) {
 		{"channel type", func(e *Exercise) { e.Returns = "chan int" }, "não suportado"},
 		{"map with int keys", func(e *Exercise) { e.Returns = "map[int]string" }, "não suportado"},
 		{"map with string keys", func(e *Exercise) { e.Returns = "map[string][]int" }, ""},
+		{"param names count", func(e *Exercise) { e.ParamNames = []string{"a", "b"} }, "param_names"},
+		{"param name invalid", func(e *Exercise) { e.ParamNames = []string{"1x"} }, "nome inválido"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -63,10 +65,21 @@ func TestValidate(t *testing.T) {
 }
 
 func TestSignature(t *testing.T) {
-	e := validExercise()
-	e.Params = []string{"[]int", "string"}
-	if got, want := e.Signature(), "func Sum(a0 []int, a1 string) int"; got != want {
-		t.Errorf("Signature() = %q, want %q", got, want)
+	tests := []struct {
+		params, names []string
+		want          string
+	}{
+		{nil, nil, "func Sum() int"},
+		{[]string{"[]int", "string"}, nil, "func Sum(p0 []int, p1 string) int"},
+		{[]string{"string", "string", "int"}, []string{"a", "b", "n"}, "func Sum(a, b string, n int) int"},
+		{[]string{"int", "string", "int"}, []string{"a", "s", "b"}, "func Sum(a int, s string, b int) int"},
+	}
+	for _, tt := range tests {
+		e := validExercise()
+		e.Params, e.ParamNames = tt.params, tt.names
+		if got := e.Signature(); got != tt.want {
+			t.Errorf("Signature() = %q, want %q", got, tt.want)
+		}
 	}
 }
 

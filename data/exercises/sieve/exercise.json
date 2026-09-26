@@ -4,6 +4,7 @@
   "difficulty": "hard",
   "function": "Primes",
   "params": ["int"],
+  "param_names": ["limit"],
   "returns": "[]int",
   "timeout_ms": 1000,
   "tests": [

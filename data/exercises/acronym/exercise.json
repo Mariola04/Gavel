@@ -4,6 +4,7 @@
   "difficulty": "medium",
   "function": "Abbreviate",
   "params": ["string"],
+  "param_names": ["s"],
   "returns": "string",
   "timeout_ms": 1000,
   "tests": [

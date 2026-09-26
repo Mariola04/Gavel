@@ -4,6 +4,7 @@
   "difficulty": "hard",
   "function": "Nth",
   "params": ["int"],
+  "param_names": ["n"],
   "returns": "int",
   "timeout_ms": 2000,
   "tests": [

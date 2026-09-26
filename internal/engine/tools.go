@@ -121,7 +121,9 @@ func (e *Engine) goEnv(dir string) []string {
 func toolMessages(out, dir string) []string {
 	var msgs []string
 	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(strings.ReplaceAll(line, dir+string(filepath.Separator), ""))
+		line = strings.ReplaceAll(line, dir+string(filepath.Separator), "")
+		// Paths are shown relative to the student's file, as in parse errors.
+		line = strings.TrimSpace(strings.ReplaceAll(line, "solution/solution.go", "solution.go"))
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}

@@ -4,6 +4,7 @@
   "difficulty": "easy",
   "function": "Score",
   "params": ["float64", "float64"],
+  "param_names": ["x", "y"],
   "returns": "int",
   "timeout_ms": 1000,
   "tests": [

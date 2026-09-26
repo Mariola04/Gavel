@@ -22,7 +22,15 @@ import (
 
 const correctFactorial = "package solution\n\nfunc Factorial(n int) int {\n\tif n <= 1 {\n\t\treturn 1\n\t}\n\treturn n * Factorial(n-1)\n}\n"
 
+// testAdminPassword is a dummy password used only by these tests.
+const testAdminPassword = "test-only-password"
+
 func newTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	return newTestServerWithAdmin(t, testAdminPassword)
+}
+
+func newTestServerWithAdmin(t *testing.T, adminPassword string) *httptest.Server {
 	t.Helper()
 	repo, err := exercise.Load("../../data/exercises")
 	if err != nil {
@@ -42,7 +50,8 @@ func newTestServer(t *testing.T) *httptest.Server {
 	}
 	web := fstest.MapFS{"index.html": {Data: []byte("<h1>Gavel</h1>")}}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	ts := httptest.NewServer(New(client.NewLocal(repo, exams, eng, st), web, logger))
+	c := client.NewLocal(repo, exams, eng, st)
+	ts := httptest.NewServer(New(Config{Client: c, Admin: c, AdminPassword: adminPassword, Web: web, Logger: logger}))
 	t.Cleanup(ts.Close)
 	return ts
 }
@@ -251,7 +260,7 @@ func TestRemoteClient(t *testing.T) {
 	if _, err := c.Exercise(ctx, "nope"); !errors.Is(err, client.ErrNotFound) {
 		t.Errorf("Exercise(nope) error = %v, want ErrNotFound", err)
 	}
-	a, err := c.StartAttempt(ctx, "hard")
+	a, err := c.StartAttempt(ctx, "hard", "Ana")
 	if err != nil || len(a.ExerciseIDs) != 4 {
 		t.Fatalf("StartAttempt: %+v, %v", a, err)
 	}
@@ -265,5 +274,96 @@ func TestRemoteClient(t *testing.T) {
 	}
 	if _, err := c.Report(ctx, r.SubmissionID); err != nil {
 		t.Errorf("Report: %v", err)
+	}
+}
+
+func TestStudentIsRecorded(t *testing.T) {
+	ts := newTestServer(t)
+
+	var a client.AttemptView
+	if code := call(t, "POST", ts.URL+"/api/exams/easy/attempts", `{"student":"  Ana Silva "}`, &a); code != 201 || a.Student != "Ana Silva" {
+		t.Fatalf("start: status %d, student %q", code, a.Student)
+	}
+	// Inside an attempt, the attempt's student wins over the request.
+	body := submitBody(t, client.SubmitRequest{ExerciseID: a.ExerciseIDs[0], Code: "package solution\n", AttemptID: a.ID, Student: "Outro"})
+	var r engine.Report
+	if code := call(t, "POST", ts.URL+"/api/submissions", body, &r); code != 200 || r.Student != "Ana Silva" {
+		t.Fatalf("submit in attempt: status %d, student %q", code, r.Student)
+	}
+	body = submitBody(t, client.SubmitRequest{ExerciseID: "factorial", Code: "package solution\n", Student: "Rui"})
+	if code := call(t, "POST", ts.URL+"/api/submissions", body, &r); code != 200 || r.Student != "Rui" {
+		t.Fatalf("practice submit: status %d, student %q", code, r.Student)
+	}
+
+	var e errorBody
+	body = submitBody(t, client.SubmitRequest{ExerciseID: "factorial", Student: strings.Repeat("a", 81)})
+	if code := call(t, "POST", ts.URL+"/api/submissions", body, &e); code != 400 {
+		t.Errorf("long name: status %d", code)
+	}
+	if code := call(t, "POST", ts.URL+"/api/exams/easy/attempts", `{"student":"a\u0000b"}`, &e); code != 400 {
+		t.Errorf("control character: status %d", code)
+	}
+}
+
+// adminCall sends an admin request with the given password (none if empty).
+func adminCall(t *testing.T, url, password string, out any) int {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if password != "" {
+		req.Header.Set("Authorization", "Bearer "+password)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		t.Fatal(err)
+	}
+	return resp.StatusCode
+}
+
+func TestAdminRoutes(t *testing.T) {
+	ts := newTestServer(t)
+
+	var a client.AttemptView
+	call(t, "POST", ts.URL+"/api/exams/easy/attempts", `{"student":"Ana"}`, &a)
+	body := submitBody(t, client.SubmitRequest{ExerciseID: a.ExerciseIDs[0], Code: "package solution\n", AttemptID: a.ID})
+	call(t, "POST", ts.URL+"/api/submissions", body, nil)
+
+	var e errorBody
+	for _, path := range []string{"/api/admin/submissions", "/api/admin/attempts"} {
+		if code := adminCall(t, ts.URL+path, "", &e); code != 401 {
+			t.Errorf("%s without password: status %d", path, code)
+		}
+		if code := adminCall(t, ts.URL+path, "wrong", &e); code != 401 {
+			t.Errorf("%s with wrong password: status %d", path, code)
+		}
+	}
+
+	var subs []client.SubmissionSummary
+	if code := adminCall(t, ts.URL+"/api/admin/submissions", testAdminPassword, &subs); code != 200 || len(subs) != 1 {
+		t.Fatalf("submissions: status %d, %+v", code, subs)
+	}
+	if s := subs[0]; s.Student != "Ana" || s.AttemptID != a.ID || s.Verdict != engine.VerdictRejected {
+		t.Errorf("submission summary = %+v", s)
+	}
+	var attempts []client.AttemptView
+	if code := adminCall(t, ts.URL+"/api/admin/attempts", testAdminPassword, &attempts); code != 200 || len(attempts) != 1 {
+		t.Fatalf("attempts: status %d, %+v", code, attempts)
+	}
+	if got := attempts[0]; got.Student != "Ana" || got.Score.Exercises[0].Submissions != 1 {
+		t.Errorf("attempt = %+v", got)
+	}
+}
+
+func TestAdminDisabledWithoutPassword(t *testing.T) {
+	ts := newTestServerWithAdmin(t, "")
+	var e errorBody
+	if code := adminCall(t, ts.URL+"/api/admin/submissions", "", &e); code != 404 || !strings.Contains(e.Error, "GAVEL_ADMIN_PASSWORD") {
+		t.Fatalf("status %d, error %q", code, e.Error)
 	}
 }

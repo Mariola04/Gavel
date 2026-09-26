@@ -4,6 +4,7 @@
   "difficulty": "hard",
   "function": "FindFewestCoins",
   "params": ["[]int", "int"],
+  "param_names": ["coins", "target"],
   "returns": "[]int",
   "timeout_ms": 1000,
   "tests": [

@@ -71,27 +71,36 @@ func (s *Store) Report(id string) (*engine.Report, error) {
 	return &r, nil
 }
 
-// ReportsByAttempt returns every report associated with the attempt.
-func (s *Store) ReportsByAttempt(attemptID string) ([]*engine.Report, error) {
-	entries, err := os.ReadDir(s.reportsDir)
+// Reports returns every saved report, oldest first.
+func (s *Store) Reports() ([]*engine.Report, error) {
+	ids, err := listIDs(s.reportsDir)
 	if err != nil {
 		return nil, fmt.Errorf("listar relatórios: %w", err)
 	}
-	var reports []*engine.Report
-	for _, entry := range entries {
-		id, ok := strings.CutSuffix(entry.Name(), ".json")
-		if !ok || !idPattern.MatchString(id) {
-			continue
-		}
+	reports := make([]*engine.Report, 0, len(ids))
+	for _, id := range ids {
 		r, err := s.Report(id)
 		if err != nil {
 			return nil, err
 		}
+		reports = append(reports, r)
+	}
+	return reports, nil
+}
+
+// ReportsByAttempt returns every report associated with the attempt,
+// oldest first.
+func (s *Store) ReportsByAttempt(attemptID string) ([]*engine.Report, error) {
+	all, err := s.Reports()
+	if err != nil {
+		return nil, err
+	}
+	var reports []*engine.Report
+	for _, r := range all {
 		if r.AttemptID == attemptID {
 			reports = append(reports, r)
 		}
 	}
-	sort.Slice(reports, func(i, j int) bool { return reports[i].SubmissionID < reports[j].SubmissionID })
 	return reports, nil
 }
 
@@ -107,6 +116,40 @@ func (s *Store) Attempt(id string) (*exam.Attempt, error) {
 		return nil, err
 	}
 	return &a, nil
+}
+
+// Attempts returns every saved attempt, oldest first.
+func (s *Store) Attempts() ([]*exam.Attempt, error) {
+	ids, err := listIDs(s.attemptsDir)
+	if err != nil {
+		return nil, fmt.Errorf("listar tentativas: %w", err)
+	}
+	attempts := make([]*exam.Attempt, 0, len(ids))
+	for _, id := range ids {
+		a, err := s.Attempt(id)
+		if err != nil {
+			return nil, err
+		}
+		attempts = append(attempts, a)
+	}
+	return attempts, nil
+}
+
+// listIDs returns the ids of the JSON files in dir. Ids start with a
+// timestamp, so sorting them also sorts by creation time.
+func listIDs(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for _, entry := range entries {
+		if id, ok := strings.CutSuffix(entry.Name(), ".json"); ok && idPattern.MatchString(id) {
+			ids = append(ids, id)
+		}
+	}
+	sort.Strings(ids)
+	return ids, nil
 }
 
 // save writes v to dir/id.json atomically, so readers never see a

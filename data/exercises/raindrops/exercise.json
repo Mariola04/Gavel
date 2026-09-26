@@ -4,6 +4,7 @@
   "difficulty": "easy",
   "function": "Convert",
   "params": ["int"],
+  "param_names": ["n"],
   "returns": "string",
   "timeout_ms": 1000,
   "tests": [

@@ -42,6 +42,10 @@ func TestReportsRoundTrip(t *testing.T) {
 	if err != nil || len(byAttempt) != 2 {
 		t.Fatalf("ReportsByAttempt = %d reports, %v", len(byAttempt), err)
 	}
+	all, err := s.Reports()
+	if err != nil || len(all) != 3 || all[0].SubmissionID != "20260926T110200-000001" {
+		t.Fatalf("Reports = %d reports, %v", len(all), err)
+	}
 }
 
 func TestAttemptRoundTrip(t *testing.T) {
@@ -56,6 +60,10 @@ func TestAttemptRoundTrip(t *testing.T) {
 	got, err := s.Attempt(a.ID)
 	if err != nil || got.Seed != 42 || !got.Contains("sum") {
 		t.Fatalf("Attempt = %+v, %v", got, err)
+	}
+	all, err := s.Attempts()
+	if err != nil || len(all) != 1 || all[0].ID != a.ID {
+		t.Fatalf("Attempts = %+v, %v", all, err)
 	}
 }
 

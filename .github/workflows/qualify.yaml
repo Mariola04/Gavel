@@ -1,0 +1,69 @@
+name: qualify
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or PR cancels the run in progress.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Format, vet and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Check formatting
+        run: make fmt-check
+
+      - name: go vet
+        run: make vet
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          # .golangci.yml uses the v1 configuration format.
+          version: v1.64.8
+
+  test:
+    name: Tests (Go ${{ matrix.go }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The minimum supported version and the latest release.
+        go: ["1.22", "stable"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+
+      # With gosec installed the security stage runs for real; on Go 1.22 it
+      # is left out, which exercises the "skipped" path of the pipeline.
+      - name: Install gosec
+        if: matrix.go == 'stable'
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      # Build cache used by the engine to compile submissions in the tests.
+      - uses: actions/cache@v4
+        with:
+          path: data/.cache/go-build
+          key: gavel-gocache-${{ runner.os }}-go${{ matrix.go }}-${{ hashFiles('go.mod') }}
+
+      - name: Tests (race detector)
+        run: make test
+
+      - name: Build
+        run: make build

@@ -4,6 +4,7 @@
   "difficulty": "medium",
   "function": "Distance",
   "params": ["string", "string"],
+  "param_names": ["a", "b"],
   "returns": "int",
   "timeout_ms": 1000,
   "tests": [

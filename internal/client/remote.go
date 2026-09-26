@@ -58,8 +58,9 @@ func (c *RemoteClient) Exams(ctx context.Context) ([]*exam.Exam, error) {
 }
 
 // StartAttempt starts a new attempt of an exam.
-func (c *RemoteClient) StartAttempt(ctx context.Context, examID string) (*AttemptView, error) {
-	return call[*AttemptView](ctx, c, http.MethodPost, "/api/exams/"+url.PathEscape(examID)+"/attempts", nil)
+func (c *RemoteClient) StartAttempt(ctx context.Context, examID, student string) (*AttemptView, error) {
+	body := StartAttemptRequest{Student: student}
+	return call[*AttemptView](ctx, c, http.MethodPost, "/api/exams/"+url.PathEscape(examID)+"/attempts", body)
 }
 
 // Attempt returns an attempt with its current score.

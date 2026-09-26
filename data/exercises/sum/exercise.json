@@ -4,6 +4,7 @@
   "difficulty": "easy",
   "function": "Sum",
   "params": ["[]int"],
+  "param_names": ["numbers"],
   "returns": "int",
   "timeout_ms": 1000,
   "tests": [
