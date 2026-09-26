@@ -14,6 +14,12 @@ make build                     # builds bin/gavel
 Open <http://localhost:8080> in a browser. Alternatively, `make run` starts the
 server with `go run`.
 
+In the web editor, students can type the solution or load it from a file:
+**Carregar .go** in the editor bar, or drag a `.go` file onto the editor. The
+file's code replaces the editor's content (after asking, if there was other
+code) so it can be checked before pressing **Submeter**. Only `.go` text
+files up to 64 KB are accepted.
+
 Commands run from the repository root (they use `./data`). To use a different
 data directory, set `GAVEL_DATA`.
 

@@ -7,6 +7,8 @@
 const LEVELS = ["easy", "medium", "hard"];
 const LEVEL_LABELS = { easy: "Fácil", medium: "Médio", hard: "Difícil" };
 const LEVEL_POINTS = { easy: 1, medium: 2, hard: 3 };
+// MAX_CODE_BYTES mirrors engine.MaxCodeSize; the server enforces it anyway.
+const MAX_CODE_BYTES = 64 * 1024;
 
 const STAGES = ["limits", "parse", "ast", "gofmt", "complexity", "vet", "gosec", "build"];
 const STAGE_LABELS = {
@@ -51,6 +53,7 @@ const ICONS = {
   file: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>',
   exit: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
   list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  upload: '<path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
@@ -159,6 +162,7 @@ const state = {
   adminToken: sessionGet("gavel:admin"),
   admin: { tab: "sessions", query: "", verdict: "", attemptsQuery: "", sessions: [], submissions: [], attempts: [], timer: null },
   attemptDeadline: 0,
+  attemptTimer: null,
   sessionsTimer: null,
 };
 
@@ -237,6 +241,30 @@ async function route() {
   showSidebar(true);
   renderAttemptSidebar(exerciseId);
   renderWorkspace({ exerciseId, scope: state.attempt.attempt_id });
+  if (state.attempt.open) watchAttempt(state.attempt.attempt_id);
+}
+
+// watchAttempt asks the server every 15 s whether the exam is still open, so
+// the editor locks as soon as the teacher closes it early.
+function watchAttempt(attemptId) {
+  clearTimeout(state.attemptTimer);
+  state.attemptTimer = setTimeout(async () => {
+    const r = parseRoute();
+    if (r.mode !== "exam" || r.attemptId !== attemptId || !state.attempt?.open) return;
+    try {
+      const fresh = await api("GET", `/api/attempts/${encodeURIComponent(attemptId)}`);
+      if (!fresh.open) {
+        setAttempt(fresh);
+        toast("O docente terminou a prova. Já não é possível submeter.", "error");
+        route();
+        return;
+      }
+      setAttempt(fresh);
+    } catch {
+      // Network hiccup: try again on the next tick.
+    }
+    watchAttempt(attemptId);
+  }, 15000);
 }
 
 function showSidebar(visible) {
@@ -439,7 +467,7 @@ async function renderOpenSessions() {
         el("span", {}, el("strong", {}, points), " pontos")),
       el("p", { class: "exam-time" }, icon("clock", 14), `Termina às ${fmtClock(s.ends_at)} · faltam `, countdown(deadlineOf(s))),
       el("button", { type: "button", class: "btn btn-primary", onclick: (event) => joinSession(s.session_id, event.currentTarget) },
-        icon("play", 14), "Entrar na prova"));
+        icon("play", 14), state.attempt?.session_id === s.session_id ? "Continuar a prova" : "Entrar na prova"));
   });
 
   $("main").replaceChildren(el("div", { class: "page" },
@@ -451,8 +479,8 @@ async function renderOpenSessions() {
         "Quando o docente abrir uma prova, ela aparece aqui automaticamente."),
     lastAttempt ? el("div", { class: "card resume" },
       el("div", { class: "resume-text" },
-        el("h3", {}, "A sua última prova"),
-        el("p", {}, "Veja os exercícios e a nota, ou continue se ainda estiver aberta.")),
+        el("h3", {}, "A sua prova anterior"),
+        el("p", {}, "Veja os exercícios e a nota da última prova em que entrou. Para uma prova nova, use \"Entrar na prova\" acima.")),
       el("button", { type: "button", class: "btn btn-ghost", onclick: () => go("prova", lastAttempt) }, "Abrir")) : null,
   ));
   // Refresh the list while the student waits on it.
@@ -642,6 +670,44 @@ function createEditor(ex, scope, onSubmit, locked = false) {
   });
 
   submitButton.addEventListener("click", () => onSubmit(textarea.value, submitButton));
+
+  // Loading a .go file puts its code in the editor, so the student sees what
+  // will be submitted.
+  async function loadFile(file) {
+    if (!file || locked) return;
+    if (!/\.go$/i.test(file.name)) {
+      toast(`"${file.name}" não é um ficheiro .go.`, "error");
+      return;
+    }
+    if (file.size > MAX_CODE_BYTES) {
+      toast(`"${file.name}" tem ${Math.ceil(file.size / 1024)} KB; o máximo é 64 KB.`, "error");
+      return;
+    }
+    const code = await file.text();
+    if (code.includes("\u0000")) {
+      toast(`"${file.name}" não parece ser um ficheiro de texto.`, "error");
+      return;
+    }
+    const current = textarea.value.trim();
+    if (current && current !== skeleton(ex).trim() && current !== code.trim() &&
+      !confirm(`Substituir o código do editor pelo conteúdo de "${file.name}"?`)) return;
+    textarea.value = code;
+    save();
+    textarea.focus();
+    toast(`"${file.name}" carregado. Carregue em Submeter para avaliar.`, "success");
+  }
+  const fileInput = el("input", { type: "file", accept: ".go", class: "file-input", "aria-label": "Ficheiro .go a carregar" });
+  fileInput.addEventListener("change", () => {
+    loadFile(fileInput.files[0]);
+    fileInput.value = ""; // allow loading the same file again
+  });
+  const upload = el("button", {
+    type: "button",
+    class: "btn btn-ghost btn-sm",
+    title: "Carregar um ficheiro .go (ou arrastá-lo para o editor)",
+    onclick: () => fileInput.click(),
+  }, icon("upload", 13), "Carregar .go");
+
   const reset = el("button", {
     type: "button",
     class: "btn btn-ghost btn-sm",
@@ -659,16 +725,36 @@ function createEditor(ex, scope, onSubmit, locked = false) {
   if (locked) {
     submitButton.disabled = true;
     submitButton.title = "A prova terminou";
+    upload.disabled = true;
     textarea.readOnly = true;
   }
-  return el("div", { class: "editor" },
+  const editor = el("div", { class: "editor" },
     el("div", { class: "editor-bar" },
       el("span", { class: "editor-file" }, icon("file", 14), "solution.go", el("span", { class: "sig" }, `— ${ex.signature}`)),
-      reset, submitButton),
+      fileInput, upload, reset, submitButton),
     el("div", { class: "editor-body" }, gutter, textarea),
     el("div", { class: "editor-foot" },
-      el("span", {}, locked ? "Prova terminada: o código já não pode ser submetido" : "Go · tabs · rascunho guardado automaticamente"),
+      el("span", {}, locked ? "Prova terminada: o código já não pode ser submetido" : "Go · arraste um ficheiro .go para aqui · rascunho guardado"),
       position));
+
+  // Drag and drop a .go file onto the editor.
+  if (!locked) {
+    editor.addEventListener("dragover", (event) => {
+      if (![...event.dataTransfer.types].includes("Files")) return;
+      event.preventDefault();
+      editor.classList.add("dragging");
+    });
+    editor.addEventListener("dragleave", (event) => {
+      if (!editor.contains(event.relatedTarget)) editor.classList.remove("dragging");
+    });
+    editor.addEventListener("drop", (event) => {
+      if (!event.dataTransfer.files.length) return;
+      event.preventDefault();
+      editor.classList.remove("dragging");
+      loadFile(event.dataTransfer.files[0]);
+    });
+  }
+  return editor;
 }
 
 async function submit(ex, scope, code, button, results) {
@@ -1351,8 +1437,10 @@ async function openSubmission(summary) {
 document.querySelectorAll(".segmented button").forEach((tab) => {
   tab.addEventListener("click", () => {
     if (tab.dataset.mode === "exam") {
-      if (state.attempt) go("prova", state.attempt.attempt_id);
-      else go("prova");
+      // Always show the list of open exams, so an exam the teacher closed
+      // meanwhile never hides a new one. The student's current exam is
+      // listed there with a "Continuar" button.
+      go("prova");
     } else if (tab.dataset.mode === "admin") {
       go("docente");
     } else {

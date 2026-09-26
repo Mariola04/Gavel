@@ -496,6 +496,10 @@ kbd {
   overflow: auto;
 }
 .editor textarea::selection { background: #3b3f73; }
+.file-input { display: none; }
+.editor.dragging { outline: 2px dashed var(--accent); outline-offset: 3px; }
+.editor.dragging .editor-body { opacity: .55; }
+.editor-bar .btn-ghost:disabled { opacity: .45; cursor: not-allowed; }
 .editor-foot {
   display: flex;
   justify-content: space-between;

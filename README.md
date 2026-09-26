@@ -38,7 +38,8 @@ make build
 ./bin/gavel serve          # open http://localhost:8080
 ```
 
-Type a name, pick an exercise, write the function and press **Submeter**.
+Type a name, pick an exercise, write the function (or load a `.go` file) and
+press **Submeter**.
 For the teacher area, start the server with
 `GAVEL_ADMIN_PASSWORD='choose-a-password' ./bin/gavel serve`.
 
@@ -47,6 +48,15 @@ Prefer the terminal?
 ```sh
 ./bin/gavel exercises
 ./bin/gavel submit factorial my_solution.go
+```
+
+The same commands also work against a running server (local or on another
+machine) when `SERVER` is set:
+
+```sh
+export SERVER=http://localhost:8080
+./bin/gavel exercises        # now served over HTTP
+unset SERVER                 # back to the local disk
 ```
 
 ## Documentation

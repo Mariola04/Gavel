@@ -13,7 +13,8 @@ Everything Gavel can do, in one page. Details in the [README](README.md) and the
 - Students first type a **name / student number** (no password) → saved on every submission and attempt.
 - Options: `-addr host:port`, `-sandbox auto|firejail|none`
 - **Prática**: search/filter exercises, editor (auto-indent, `Tab`, `Ctrl+Enter` submits, drafts auto-saved), report with static + dynamic results.
-- **Prova**: lists the exams the teacher opened (countdown) → **Entrar na prova** → same exercises for everyone → submit each → live score. Editor locks when time ends. Joining again with the same name resumes.
+- **Upload a file**: **Carregar .go** in the editor bar, or drag a `.go` file onto the editor → its code fills the editor → **Submeter**. Only `.go` text files up to 64 KB.
+- **Prova**: always lists the exams the teacher opened (countdown) → **Entrar na prova** (or **Continuar a prova** if already in it) → same exercises for everyone → submit each → live score. Editor locks when time ends. Joining again with the same name resumes.
 - Links are shareable: `#/exercicio/<id>`, `#/prova/<attempt_id>`, `#/docente`.
 
 ## Teacher area ("Docente" tab)
